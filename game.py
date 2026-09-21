@@ -73,41 +73,39 @@ def adjacents_cardinal(x, y):
 
 # thanks Nicky Case :D
 def ray_intersect(ray, segment):
-    try:
-        # RAY in parametric: Point + Delta*T1
-        r_px = ray[0][0]
-        r_py = ray[0][1]
-        r_dx = ray[1][0] - ray[0][0]
-        r_dy = ray[1][1] - ray[0][1]
-        # SEGMENT in parametric: Point + Delta*T2
-        s_px = segment[0][0]
-        s_py = segment[0][1]
-        s_dx = segment[1][0] - segment[0][0]
-        s_dy = segment[1][1] - segment[0][1]
-        # Are they parallel? If so, no intersect
-        r_mag = math.sqrt(r_dx * r_dx + r_dy * r_dy)
-        s_mag = math.sqrt(s_dx * s_dx + s_dy * s_dy)
-        if r_dx / r_mag == s_dx / s_mag and r_dy / r_mag == s_dy / s_mag:
-            # Unit vectors are the same.
-            return None
-
-        # SOLVE FOR T1 & T2
-        # r_px+r_dx*T1 = s_px+s_dx*T2 && r_py+r_dy*T1 = s_py+s_dy*T2
-        # ==> T1 = (s_px+s_dx*T2-r_px)/r_dx = (s_py+s_dy*T2-r_py)/r_dy
-        # ==> s_px*r_dy + s_dx*T2*r_dy - r_px*r_dy = s_py*r_dx + s_dy*T2*r_dx - r_py*r_dx
-        # ==> T2 = (r_dx*(s_py-r_py) + r_dy*(r_px-s_px))/(s_dx*r_dy - s_dy*r_dx)
-        T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx)
-        T1 = (s_px + s_dx * T2 - r_px) / r_dx
-        # Must be within parametic whatevers for RAY/SEGMENT
-        if T1 < 0:
-            return None
-        if T2 < 0 or T2 > 1:
-            return None
-
-        # Return the POINT OF INTERSECTION
-        return ((r_px + r_dx * T1, r_py + r_dy * T1), T1)
-    except ZeroDivisionError:
+    r_px, r_py = ray[0]
+    r_dx = ray[1][0] - r_px
+    r_dy = ray[1][1] - r_py
+    
+    s_px, s_py = segment[0]
+    s_dx = segment[1][0] - s_px
+    s_dy = segment[1][1] - s_py
+    
+    denom = s_dx * r_dy - s_dy * r_dx
+    
+    # Are they parallel? (Check against a tiny epsilon instead of exact 0)
+    if abs(denom) < 1e-8:
         return None
+
+    # T2 is the scalar along the line segment
+    T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / denom
+    
+    # T1 is the scalar along the ray.
+    # To prevent ZeroDivisionError, use the axis with the larger delta
+    if abs(r_dx) > abs(r_dy):
+        T1 = (s_px + s_dx * T2 - r_px) / r_dx
+    else:
+        T1 = (s_py + s_dy * T2 - r_py) / r_dy
+
+    # Epsilon bounds check
+    # T1 > -1e-6: The intersection is in front of the ray (or exactly at origin)
+    # T2 between -1e-6 and 1 + 1e-6: The intersection is on the segment
+    epsilon = 1e-6
+    if T1 > -epsilon and -epsilon <= T2 <= 1.0 + epsilon:
+        # Return the exact intersection point and distance (T1)
+        return ((r_px + r_dx * T1, r_py + r_dy * T1), T1)
+        
+    return None
 
 
 
@@ -150,7 +148,7 @@ def calculate_sweep_line(origin_x, origin_y, edges):
         real_angle = group_list[0][2]
         ray = (origin, (origin_x + math.cos(real_angle), origin_y + math.sin(real_angle)))
 
-        def get_closest():
+        def get_closest(ray=ray):
             closest_pt, min_dist = None, float('inf')
             for s in active_segments:
                 intersect = ray_intersect(ray, s)
@@ -197,10 +195,12 @@ class LevelMap:
         self.player_start = (0, 0)
         self.goal = None
         guard_tiles = set()
+        wall_tiles = set()
         for y in range(self.im.height):
             for x in range(self.im.width):
                 p = self.im.getpixel((x, y))
                 if p == LevelMap.TILEMAP_WALL:
+                    wall_tiles.add((x, y))
                     self.walls.append(
                         pygame.Rect(
                             x * self.scale_factor,
@@ -214,26 +214,47 @@ class LevelMap:
                 elif p == LevelMap.TILEMAP_GUARD:
                     guard_tiles.add((x, y))
 
-        self.wall_endpoints: list[tuple[int, int]] = functools.reduce(
-            operator.iadd, (rect_endpoints(r) for r in self.walls), []
-        )
-        self.wall_edges = functools.reduce(
-            operator.iadd, (rect_edges(r) for r in self.walls), []
-        )
-        self.wall_edges.extend(
-            [
-                ((0, 0), (AREA_WIDTH, 0)),
-                ((0, 0), (0, AREA_HEIGHT)),
-                ((AREA_WIDTH, 0), (AREA_WIDTH, AREA_HEIGHT)),
-                ((AREA_WIDTH, AREA_HEIGHT), (0, AREA_HEIGHT)),
-            ]
-        )
-        self.unique_wall_endpoints = set()
-        for endpoint, count in collections.Counter(self.wall_endpoints).items():
-            if count == 2:
-                self.unique_wall_endpoints.add(endpoint)
-        for p in [(0, 0), (AREA_WIDTH, 0), (0, AREA_HEIGHT), (AREA_WIDTH, AREA_HEIGHT)]:
-            self.unique_wall_endpoints.add(p)
+        self.wall_edges = []
+        
+        # 1. Merge Horizontal Edges
+        for y in range(self.im.height + 1):
+            start_x = None
+            for x in range(self.im.width + 1):
+                # An edge exists if one side is a wall and the other is empty
+                is_wall_below = (x, y) in wall_tiles
+                is_wall_above = (x, y - 1) in wall_tiles
+                has_edge = is_wall_below ^ is_wall_above
+                
+                if has_edge and start_x is None:
+                    start_x = x # Start tracking a new continuous edge
+                elif not has_edge and start_x is not None:
+                    # End the continuous edge and scale it to screen coordinates
+                    self.wall_edges.append((
+                        (start_x * self.scale_factor, y * self.scale_factor),
+                        (x * self.scale_factor, y * self.scale_factor)
+                    ))
+                    start_x = None
+                    
+        # 2. Merge Vertical Edges
+        for x in range(self.im.width + 1):
+            start_y = None
+            for y in range(self.im.height + 1):
+                is_wall_right = (x, y) in wall_tiles
+                is_wall_left = (x - 1, y) in wall_tiles
+                has_edge = is_wall_right ^ is_wall_left
+                
+                if has_edge and start_y is None:
+                    start_y = y
+                elif not has_edge and start_y is not None:
+                    self.wall_edges.append((
+                        (x * self.scale_factor, start_y * self.scale_factor),
+                        (x * self.scale_factor, y * self.scale_factor)
+                    ))
+                    start_y = None
+
+        # Add screen borders to edges so rays always hit a boundary
+        border_rect = pygame.Rect(0, 0, AREA_WIDTH, AREA_HEIGHT)
+        self.wall_edges.extend(rect_edges(border_rect))
 
         self.guard_routes = []
         while guard_tiles:
@@ -369,40 +390,8 @@ class Guard(MovableEntity):
             self.radius,
         )
 
-        def angle_to(pt: tuple[int, int]) -> float:
-            dx = pt[0] - screen_pos[0]
-            dy = pt[1] - screen_pos[1]
-            return math.atan2(dy, dx)
+        points = calculate_sweep_line(screen_pos[0], screen_pos[1], self.level.wall_edges)
 
-        intersects = []
-        unique_angles = {angle_to(endpt) for endpt in self.level.unique_wall_endpoints}
-        unique_angles = set()
-        for endpt in self.level.unique_wall_endpoints:
-            angle = angle_to(endpt)
-            unique_angles.add(angle)
-            unique_angles.add(angle + 0.001)
-            unique_angles.add(angle - 0.001)
-        for angle in unique_angles:
-            dx = math.cos(angle)
-            dy = math.sin(angle)
-            ray = (screen_pos, (screen_pos[0] + dx, screen_pos[1] + dy))
-            closest_point = None
-            closest_param = None
-            for segment in self.level.wall_edges:
-                intersect = ray_intersect(ray, segment)
-                if not intersect:
-                    continue
-                point, param = intersect
-                if not closest_point or param < closest_param:
-                    closest_point = point
-                    closest_param = param
-            if not closest_point:
-                continue
-            intersects.append((closest_point, closest_param, angle))
-        intersects.sort(key=lambda i: i[2])
-        points = [i[0] for i in intersects]
-        if not points:
-            return
         pygame.draw.polygon(surface, (0, 255, 255, 128), points)
 
 
