@@ -309,17 +309,32 @@ while running:
                 guard.update(dt, LEVEL.walls)
 
     player.update(dt, LEVEL.walls)
+    player_vis_poly = calculate_sweep_line(
+        player.pos.x, 
+        player.pos.y, 
+        LEVEL.wall_edges
+    )
 
     screen.fill(BG_COLOR)
 
-    for wall in LEVEL.walls:
-        pygame.draw.rect(screen, WALL_COLOR, wall, border_radius=4)
-        pygame.draw.rect(screen, BORDER_COLOR, wall, width=2, border_radius=4)
 
-    player.draw(screen)
     for guard in guards:
         guard.draw(screen)
 
+    player.draw(screen)
+    if len(player_vis_poly) >= 3:
+        fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+        fog_surf.fill((10, 10, 15))        
+        MASK_COLOR = (255, 0, 255)
+        # pygame.gfxdraw.aapolygon(fog_surf, player_vis_poly, MASK_COLOR)
+        pygame.gfxdraw.filled_polygon(fog_surf, player_vis_poly, MASK_COLOR)
+        
+        fog_surf.set_colorkey(MASK_COLOR)
+        
+        screen.blit(fog_surf, (0, 0))
+    for wall in LEVEL.walls:
+        pygame.draw.rect(screen, WALL_COLOR, wall, border_radius=4)
+        pygame.draw.rect(screen, BORDER_COLOR, wall, width=2, border_radius=4)
     pygame.display.flip()
 
 pygame.quit()
