@@ -1,5 +1,7 @@
+import copy
 import math
 import sys
+from collections import deque
 from pathlib import Path
 from typing import Self
 
@@ -290,6 +292,10 @@ guards = [Guard(route, LEVEL) for route in LEVEL.guard_routes]
 GUARD_STEP_EVENT = pygame.USEREVENT + 1
 pygame.time.set_timer(GUARD_STEP_EVENT, 500)
 
+state_snapshots = deque(maxlen=10)
+SNAPSHOT_EVENT = pygame.USEREVENT + 2
+pygame.time.set_timer(SNAPSHOT_EVENT, 500)
+
 running = True
 t = 0.0
 while running:
@@ -307,6 +313,11 @@ while running:
         if event.type == GUARD_STEP_EVENT:
             for guard in guards:
                 guard.update(dt, LEVEL.walls)
+        if event.type == SNAPSHOT_EVENT:
+            state_snapshots.append((copy.deepcopy(player), copy.deepcopy(guards)))
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+            player = copy.deepcopy(state_snapshots[0][0])
+            guards = copy.deepcopy(state_snapshots[0][1])
 
     player.update(dt, LEVEL.walls)
     player_vis_poly = calculate_sweep_line(
