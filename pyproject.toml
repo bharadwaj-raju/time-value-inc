@@ -8,3 +8,8 @@ dependencies = [
     "pillow>=12.3.0",
     "pygame-ce>=2.5.8",
 ]
+
+[dependency-groups]
+dev = [
+    "pyinstrument>=5.1.3",
+]
