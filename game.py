@@ -66,6 +66,7 @@ class LevelMap:
         self.walls = []
         self.player_start = (0, 0)
         self.goal = None
+        guard_tiles = set()
         for y in range(self.im.height):
             for x in range(self.im.width):
                 p = self.im.getpixel((x, y))
@@ -80,6 +81,19 @@ class LevelMap:
                     )
                 elif p == LevelMap.TILEMAP_PLAYER:
                     self.player_start = (x * self.scale_factor, y * self.scale_factor)
+                elif p == LevelMap.TILEMAP_GUARD:
+                    guard_tiles.add((x, y))
+
+        self.guard_routes = []
+        while guard_tiles:
+            tile = guard_tiles.pop()
+            route = [tile]
+            for other_tile in guard_tiles:
+                if (abs(other_tile[0] - tile[0]) == 1) ^ (abs(other_tile[1] - tile[1]) == 1):
+                    route.append(other_tile)
+            for tile in route[1:]:
+                guard_tiles.remove(tile)
+            self.guard_routes.append(set(route))
 
 
 class MovableEntity:
