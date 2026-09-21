@@ -1,8 +1,14 @@
 import sys
+from pathlib import Path
+from typing import Self
 
 import pygame
+from PIL import Image
 
 pygame.init()
+
+ROOT = Path(__file__).parent
+LEVELS_DIR = ROOT / "levels"
 
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -15,15 +21,16 @@ WALL_COLOR = (140, 140, 160)
 BORDER_COLOR = (60, 60, 75)
 
 
-def rect_edges(rect: pygame.Rect):
+def rect_edges(rect: pygame.Rect) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     return [
         (rect.topleft, rect.topright),
         (rect.topright, rect.bottomright),
         (rect.bottomright, rect.bottomleft),
-        (rect.bottomleft, rect.topleft)
+        (rect.bottomleft, rect.topleft),
     ]
 
-def keys_to_vec(keys):
+
+def keys_to_vec(keys) -> pygame.Vector2:
     input_dir = pygame.Vector2(0, 0)
     if keys[pygame.K_LEFT]:
         input_dir.x -= 1
@@ -38,6 +45,42 @@ def keys_to_vec(keys):
         input_dir = input_dir.normalize()
 
     return input_dir
+
+
+class LevelMap:
+    TILEMAP_WALL = (0, 0, 0)
+    TILEMAP_PLAYER = (255, 0, 0)
+    TILEMAP_GOAL = (255, 255, 0)
+    TILEMAP_GUARD = (0, 0, 255)
+
+    def __init__(self, im: Image.Image):
+        self.im = im
+        self.scale_factor = WIDTH // im.width
+        self.process()
+
+    @classmethod
+    def from_file(cls, filelike) -> Self:
+        return cls(Image.open(filelike))
+
+    def process(self):
+        self.walls = []
+        self.player_start = (0, 0)
+        self.goal = None
+        for y in range(self.im.height):
+            for x in range(self.im.width):
+                p = self.im.getpixel((x, y))
+                if p == LevelMap.TILEMAP_WALL:
+                    self.walls.append(
+                        pygame.Rect(
+                            x * self.scale_factor,
+                            y * self.scale_factor,
+                            self.scale_factor,
+                            self.scale_factor,
+                        )
+                    )
+                elif p == LevelMap.TILEMAP_PLAYER:
+                    self.player_start = (x * self.scale_factor, y * self.scale_factor)
+
 
 class MovableEntity:
     def __init__(self, x, y, radius=20):
@@ -74,7 +117,7 @@ class MovableEntity:
                 # Center is exactly on/inside rect boundary
                 self.pos.x += self.radius
                 self.vel.x = 0
-    
+
     def update(self, dt, walls):
         self.vel -= self.vel * self.friction * dt
 
@@ -103,7 +146,7 @@ class MovableEntity:
             self.pos.y = HEIGHT - self.radius
             self.vel.y = 0
 
-        
+
 class Player(MovableEntity):
     def update(self, dt, walls):
         keys = pygame.key.get_pressed()
@@ -111,23 +154,16 @@ class Player(MovableEntity):
         self.vel += direction * self.accel * dt
         super().update(dt, walls)
 
-
     def draw(self, surface):
         pygame.draw.circle(
             surface, PLAYER_COLOR, (round(self.pos.x), round(self.pos.y)), self.radius
         )
 
 
-player = Player(WIDTH // 2, HEIGHT // 2, radius=18)
+LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
+LEVEL = LEVEL_MAPS[0]
 
-walls = [
-    pygame.Rect(120, 100, 160, 40),
-    pygame.Rect(520, 100, 160, 40),
-    pygame.Rect(220, 260, 40, 180),
-    pygame.Rect(540, 260, 40, 180),
-    pygame.Rect(340, 360, 120, 40),
-]
-
+player = Player(*LEVEL.player_start, radius=18)
 
 running = True
 while running:
@@ -142,11 +178,11 @@ while running:
         ):
             running = False
 
-    player.update(dt, walls)
+    player.update(dt, LEVEL.walls)
 
     screen.fill(BG_COLOR)
 
-    for wall in walls:
+    for wall in LEVEL.walls:
         pygame.draw.rect(screen, WALL_COLOR, wall, border_radius=4)
         pygame.draw.rect(screen, BORDER_COLOR, wall, width=2, border_radius=4)
 
