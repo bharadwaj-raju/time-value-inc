@@ -10,13 +10,15 @@ pygame.init()
 ROOT = Path(__file__).parent
 LEVELS_DIR = ROOT / "levels"
 
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+AREA_WIDTH, AREA_HEIGHT = 800, 600
+STATUSBAR_HEIGHT = 100
+screen = pygame.display.set_mode((AREA_WIDTH, AREA_HEIGHT + STATUSBAR_HEIGHT))
 pygame.display.set_caption("Time Value Inc.")
 clock = pygame.time.Clock()
 
 BG_COLOR = (24, 24, 28)
 PLAYER_COLOR = (70, 180, 255)
+GUARD_COLOR = (0, 0, 255)
 WALL_COLOR = (140, 140, 160)
 BORDER_COLOR = (60, 60, 75)
 
@@ -46,6 +48,8 @@ def keys_to_vec(keys) -> pygame.Vector2:
 
     return input_dir
 
+def adjacents_cardinal(x, y):
+    return [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
 
 class LevelMap:
     TILEMAP_WALL = (0, 0, 0)
@@ -55,7 +59,7 @@ class LevelMap:
 
     def __init__(self, im: Image.Image):
         self.im = im
-        self.scale_factor = WIDTH // im.width
+        self.scale_factor = AREA_WIDTH // im.width
         self.process()
 
     @classmethod
@@ -87,13 +91,19 @@ class LevelMap:
         self.guard_routes = []
         while guard_tiles:
             tile = guard_tiles.pop()
-            route = [tile]
-            for other_tile in guard_tiles:
-                if (abs(other_tile[0] - tile[0]) == 1) ^ (abs(other_tile[1] - tile[1]) == 1):
-                    route.append(other_tile)
-            for tile in route[1:]:
-                guard_tiles.remove(tile)
+            route = {tile}
+            while True:
+                route_next_iter = route.copy()
+                for other_tile in guard_tiles:
+                    if any(other_tile in adjacents_cardinal(*tile) for tile in route):
+                        route_next_iter.add(other_tile)
+                if len(route_next_iter) == len(route):
+                    break
+                route = route_next_iter
+            for tile in route:
+                guard_tiles.discard(tile)
             self.guard_routes.append(set(route))
+        print(len(self.guard_routes))
 
 
 class MovableEntity:
@@ -149,15 +159,15 @@ class MovableEntity:
         if self.pos.x - self.radius < 0:
             self.pos.x = self.radius
             self.vel.x = 0
-        elif self.pos.x + self.radius > WIDTH:
-            self.pos.x = WIDTH - self.radius
+        elif self.pos.x + self.radius > AREA_WIDTH:
+            self.pos.x = AREA_WIDTH - self.radius
             self.vel.x = 0
 
         if self.pos.y - self.radius < 0:
             self.pos.y = self.radius
             self.vel.y = 0
-        elif self.pos.y + self.radius > HEIGHT:
-            self.pos.y = HEIGHT - self.radius
+        elif self.pos.y + self.radius > AREA_HEIGHT:
+            self.pos.y = AREA_HEIGHT - self.radius
             self.vel.y = 0
 
 
@@ -173,16 +183,49 @@ class Player(MovableEntity):
             surface, PLAYER_COLOR, (round(self.pos.x), round(self.pos.y)), self.radius
         )
 
+class Guard(MovableEntity):
+    def __init__(self, route: set[tuple[int, int]], scale_factor: int):
+        self.route = route
+        self.scale_factor = scale_factor
+        self.last_visited = { tile: 0 for tile in route }
+        self.map_pos = next(iter(route))
+        start_screen_pos = (self.map_pos[0] * scale_factor, self.map_pos[1] * scale_factor)
+        super().__init__(*start_screen_pos, radius=scale_factor//2)
+        self.t = 0
+        self.facing = None
+
+    def update(self, dt, walls):
+        # try to go to the closest tile which hasn't been stepped on for the longest
+        adj = [p for p in adjacents_cardinal(*self.map_pos) if p in self.route]
+        next_pos = min(adj, key=lambda p: self.last_visited[p])
+        prev_pos_v = pygame.Vector2(self.map_pos)
+        next_pos_v = pygame.Vector2(next_pos)
+        self.map_pos = next_pos
+        self.t += 1
+        self.last_visited[next_pos] = self.t
+        self.facing = next_pos_v - prev_pos_v
+
+    def draw(self, surface):
+        screen_pos = (self.map_pos[0] * self.scale_factor, self.map_pos[1] * self.scale_factor)
+        pygame.draw.circle(
+            surface, GUARD_COLOR, ((screen_pos[0] + self.radius), (screen_pos[1] + self.radius)), self.radius
+        )
 
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 LEVEL = LEVEL_MAPS[0]
 
-player = Player(*LEVEL.player_start, radius=18)
+player = Player(*LEVEL.player_start, radius=LEVEL.scale_factor // 2)
+guards = [Guard(route, LEVEL.scale_factor) for route in LEVEL.guard_routes]
+
+GUARD_STEP_EVENT = pygame.USEREVENT + 1
+pygame.time.set_timer(GUARD_STEP_EVENT, 500)
 
 running = True
+t = 0.0
 while running:
     # Delta time in seconds
     dt = clock.tick(120) / 1000.0
+    t += dt
 
     for event in pygame.event.get():
         if (
@@ -191,6 +234,9 @@ while running:
             and event.key == pygame.K_ESCAPE
         ):
             running = False
+        if (event.type == GUARD_STEP_EVENT):
+            for guard in guards:
+                guard.update(dt, LEVEL.walls)
 
     player.update(dt, LEVEL.walls)
 
@@ -201,6 +247,8 @@ while running:
         pygame.draw.rect(screen, BORDER_COLOR, wall, width=2, border_radius=4)
 
     player.draw(screen)
+    for guard in guards:
+        guard.draw(screen)
 
     pygame.display.flip()
 
