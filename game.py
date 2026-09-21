@@ -4,9 +4,11 @@ import pygame
 
 from consts import AREA_HEIGHT, AREA_WIDTH, STATUSBAR_HEIGHT
 from core_game import CoreGameState
+from resources import res
 from state import StateManager
 
 pygame.init()
+res.load()
 
 screen = pygame.display.set_mode((AREA_WIDTH, AREA_HEIGHT + STATUSBAR_HEIGHT))
 pygame.display.set_caption("Time Value Inc.")
