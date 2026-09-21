@@ -1,13 +1,16 @@
+import math
 import sys
 from pathlib import Path
 from typing import Self
 
 import pygame
+import pygame.gfxdraw
 from PIL import Image
 
 from geometry import (
     adjacents_cardinal,
     calculate_sweep_line,
+    generate_cone_boundaries,
     keys_to_vec,
     rect_edges,
 )
@@ -28,6 +31,7 @@ PLAYER_COLOR = (70, 180, 255)
 GUARD_COLOR = (0, 0, 255)
 WALL_COLOR = (140, 140, 160)
 BORDER_COLOR = (60, 60, 75)
+GUARD_VIS_COLOR = (255, 255, 0, 128)
 
 
 class LevelMap:
@@ -195,6 +199,10 @@ class MovableEntity:
 
 
 class Player(MovableEntity):
+    def __init__(self, level: LevelMap):
+        super().__init__(*level.player_start, radius=level.scale_factor // 2)
+        self.level = level
+        
     def update(self, dt, walls):
         keys = pygame.key.get_pressed()
         direction = keys_to_vec(keys)
@@ -202,10 +210,12 @@ class Player(MovableEntity):
         super().update(dt, walls)
 
     def draw(self, surface):
-        pygame.draw.circle(
-            surface, PLAYER_COLOR, (round(self.pos.x), round(self.pos.y)), self.radius
+        pygame.gfxdraw.aacircle(
+            surface, round(self.pos.x), round(self.pos.y), self.radius, PLAYER_COLOR
         )
-
+        pygame.gfxdraw.filled_circle(
+            surface, round(self.pos.x), round(self.pos.y), self.radius, PLAYER_COLOR
+        )
 
 class Guard(MovableEntity):
     def __init__(self, route: set[tuple[int, int]], level: LevelMap):
@@ -221,6 +231,7 @@ class Guard(MovableEntity):
         super().__init__(*start_screen_pos, radius=level.scale_factor // 2)
         self.t = 0
         self.facing = None
+        self.update(None, None)
 
     def update(self, dt, walls):
         # try to go to the closest tile which hasn't been stepped on for the longest
@@ -245,17 +256,26 @@ class Guard(MovableEntity):
             self.radius,
         )
 
-        points = calculate_sweep_line(screen_pos[0], screen_pos[1], self.level.wall_edges)
+        if self.facing:
+            cone_edges = generate_cone_boundaries(
+                screen_pos[0], 
+                screen_pos[1], 
+                math.atan2(self.facing.y, self.facing.x), 
+                math.radians(90), 
+                1000.0
+            )
+            points = calculate_sweep_line(screen_pos[0], screen_pos[1], self.level.wall_edges + cone_edges)
 
-        shape_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
-        pygame.draw.polygon(shape_surf, (0, 255, 255, 128), points)
-        surface.blit(shape_surf)
+            shape_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
+            pygame.gfxdraw.aapolygon(shape_surf, points, GUARD_VIS_COLOR)
+            pygame.gfxdraw.filled_polygon(shape_surf, points, GUARD_VIS_COLOR)
+            surface.blit(shape_surf)
 
 
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 LEVEL = LEVEL_MAPS[0]
 
-player = Player(*LEVEL.player_start, radius=LEVEL.scale_factor // 2)
+player = Player(LEVEL)
 guards = [Guard(route, LEVEL) for route in LEVEL.guard_routes]
 
 GUARD_STEP_EVENT = pygame.USEREVENT + 1

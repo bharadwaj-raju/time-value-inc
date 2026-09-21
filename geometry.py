@@ -24,6 +24,51 @@ def point_in_polygon(x, y, poly):
         
     return inside
 
+def generate_cone_boundaries(origin_x, origin_y, facing_angle, fov_radians, view_distance):
+    edges = []
+    half_fov = fov_radians / 2.0
+    start_angle = facing_angle - half_fov
+    end_angle = facing_angle + half_fov
+    
+    # 1. The anchor point (placed 0.5 pixels BEHIND the guard)
+    # This ensures the raycaster's origin is strictly inside the closed cone.
+    back_dist = 0.5
+    back_angle = facing_angle + math.pi
+    anchor_pt = (
+        origin_x + math.cos(back_angle) * back_dist,
+        origin_y + math.sin(back_angle) * back_dist
+    )
+    
+    # 2. The far corners
+    left_far = (
+        origin_x + view_distance * math.cos(start_angle),
+        origin_y + view_distance * math.sin(start_angle)
+    )
+    right_far = (
+        origin_x + view_distance * math.cos(end_angle),
+        origin_y + view_distance * math.sin(end_angle)
+    )
+    
+    # 3. Left boundary wall
+    edges.append((anchor_pt, left_far))
+    
+    # 4. Far arc walls
+    arc_resolution = 8
+    prev_pt = left_far
+    for i in range(1, arc_resolution + 1):
+        theta = start_angle + (fov_radians * (i / arc_resolution))
+        arc_pt = (
+            origin_x + view_distance * math.cos(theta),
+            origin_y + view_distance * math.sin(theta)
+        )
+        edges.append((prev_pt, arc_pt))
+        prev_pt = arc_pt
+        
+    # 5. Right boundary wall (closing the polygon)
+    edges.append((prev_pt, anchor_pt))
+    
+    return edges
+
 def rect_edges(rect: pygame.Rect) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     return [
         (rect.topleft, rect.topright),
