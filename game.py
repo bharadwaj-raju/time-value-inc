@@ -74,7 +74,7 @@ class LevelMap:
                     guard_tiles.add((x, y))
 
         self.wall_edges = []
-        
+
         # 1. Merge Horizontal Edges
         for y in range(self.im.height + 1):
             start_x = None
@@ -83,17 +83,19 @@ class LevelMap:
                 is_wall_below = (x, y) in wall_tiles
                 is_wall_above = (x, y - 1) in wall_tiles
                 has_edge = is_wall_below ^ is_wall_above
-                
+
                 if has_edge and start_x is None:
-                    start_x = x # Start tracking a new continuous edge
+                    start_x = x  # Start tracking a new continuous edge
                 elif not has_edge and start_x is not None:
                     # End the continuous edge and scale it to screen coordinates
-                    self.wall_edges.append((
-                        (start_x * self.scale_factor, y * self.scale_factor),
-                        (x * self.scale_factor, y * self.scale_factor)
-                    ))
+                    self.wall_edges.append(
+                        (
+                            (start_x * self.scale_factor, y * self.scale_factor),
+                            (x * self.scale_factor, y * self.scale_factor),
+                        )
+                    )
                     start_x = None
-                    
+
         # 2. Merge Vertical Edges
         for x in range(self.im.width + 1):
             start_y = None
@@ -101,14 +103,16 @@ class LevelMap:
                 is_wall_right = (x, y) in wall_tiles
                 is_wall_left = (x - 1, y) in wall_tiles
                 has_edge = is_wall_right ^ is_wall_left
-                
+
                 if has_edge and start_y is None:
                     start_y = y
                 elif not has_edge and start_y is not None:
-                    self.wall_edges.append((
-                        (x * self.scale_factor, start_y * self.scale_factor),
-                        (x * self.scale_factor, y * self.scale_factor)
-                    ))
+                    self.wall_edges.append(
+                        (
+                            (x * self.scale_factor, start_y * self.scale_factor),
+                            (x * self.scale_factor, y * self.scale_factor),
+                        )
+                    )
                     start_y = None
 
         # Add screen borders to edges so rays always hit a boundary
@@ -202,7 +206,7 @@ class Player(MovableEntity):
     def __init__(self, level: LevelMap):
         super().__init__(*level.player_start, radius=level.scale_factor // 2)
         self.level = level
-        
+
     def update(self, dt, walls):
         keys = pygame.key.get_pressed()
         direction = keys_to_vec(keys)
@@ -216,6 +220,7 @@ class Player(MovableEntity):
         pygame.gfxdraw.filled_circle(
             surface, round(self.pos.x), round(self.pos.y), self.radius, PLAYER_COLOR
         )
+
 
 class Guard(MovableEntity):
     def __init__(self, route: set[tuple[int, int]], level: LevelMap):
@@ -243,12 +248,30 @@ class Guard(MovableEntity):
         self.t += 1
         self.last_visited[next_pos] = self.t
         self.facing = next_pos_v - prev_pos_v
+        screen_pos = (
+            self.map_pos[0] * self.scale_factor + self.radius,
+            self.map_pos[1] * self.scale_factor + self.radius,
+        )
+        cone_edges = generate_cone_boundaries(
+            screen_pos[0],
+            screen_pos[1],
+            math.atan2(self.facing.y, self.facing.x),
+            math.radians(90),
+            1000.0,
+        )
+        self.vis_poly_points = calculate_sweep_line(
+            screen_pos[0], screen_pos[1], self.level.wall_edges + cone_edges
+        )
 
     def draw(self, surface):
         screen_pos = (
             self.map_pos[0] * self.scale_factor + self.radius,
             self.map_pos[1] * self.scale_factor + self.radius,
         )
+        shape_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
+        pygame.gfxdraw.aapolygon(shape_surf, self.vis_poly_points, GUARD_VIS_COLOR)
+        pygame.gfxdraw.filled_polygon(shape_surf, self.vis_poly_points, GUARD_VIS_COLOR)
+        surface.blit(shape_surf)
         pygame.draw.circle(
             surface,
             GUARD_COLOR,
@@ -256,20 +279,6 @@ class Guard(MovableEntity):
             self.radius,
         )
 
-        if self.facing:
-            cone_edges = generate_cone_boundaries(
-                screen_pos[0], 
-                screen_pos[1], 
-                math.atan2(self.facing.y, self.facing.x), 
-                math.radians(90), 
-                1000.0
-            )
-            points = calculate_sweep_line(screen_pos[0], screen_pos[1], self.level.wall_edges + cone_edges)
-
-            shape_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
-            pygame.gfxdraw.aapolygon(shape_surf, points, GUARD_VIS_COLOR)
-            pygame.gfxdraw.filled_polygon(shape_surf, points, GUARD_VIS_COLOR)
-            surface.blit(shape_surf)
 
 
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
