@@ -269,10 +269,9 @@ class Guard:
 
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
+
 def render(surface, level: LevelMap, player: Player, guards: list[Guard]):
-    player_vis_poly = calculate_sweep_line(
-        player.pos.x, player.pos.y, level.wall_edges
-    )
+    player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
     for guard in guards:
         guard.draw(surface)
@@ -319,7 +318,7 @@ class CoreGameState(State):
 
     def draw(self, surface):
         render(surface, self.level, self.player, self.guards)
-        
+
     def snapshot(self):
         snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
         self.state_snapshots.append(snap)
@@ -327,6 +326,7 @@ class CoreGameState(State):
     def guard_step(self):
         for guard in self.guards:
             guard.update()
+
 
 class SnapshotViewState(State):
     def __init__(self, mgr: StateManager):
@@ -339,6 +339,13 @@ class SnapshotViewState(State):
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
+        self.snapshot_times = []
+        for i in range(len(self.core.state_snapshots))[::-1]:
+            if i == len(self.core.state_snapshots) - 1:
+                self.snapshot_times.append(self.core.snapshot_timer.duration - self.core.snapshot_timer.time_left)
+            else:
+                self.snapshot_times.append(self.snapshot_times[-1] + self.core.snapshot_timer.duration)
+        self.snapshot_times.reverse()
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -347,7 +354,9 @@ class SnapshotViewState(State):
             elif event.key == pygame.K_LEFT:
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_RIGHT:
-                self.selected = min(len(self.core.state_snapshots) - 1, self.selected + 1)
+                self.selected = min(
+                    len(self.core.state_snapshots) - 1, self.selected + 1
+                )
 
     def update(self, dt):
         if self.blur_radius < 10:
@@ -359,7 +368,9 @@ class SnapshotViewState(State):
         if self.blurred_surf:
             surface.blit(self.blurred_surf)
         else:
-            blurred_surf = pygame.transform.gaussian_blur(self.current_surf, radius=self.blur_radius)
+            blurred_surf = pygame.transform.gaussian_blur(
+                self.current_surf, radius=self.blur_radius
+            )
             surface.blit(blurred_surf)
             if self.blur_radius == 10:
                 self.blurred_surf = blurred_surf  # cache :)
@@ -372,7 +383,17 @@ class SnapshotViewState(State):
             render(preview_surf, self.core.level, snapshot[0], snapshot[1])
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
-        surface.blit(res.render_text("Travel back in time, powered by Time Value Inc.!", 16))
-        surface.blit(snapshot_previews[self.selected], dest=(AREA_WIDTH//4, AREA_HEIGHT//4))
-        snapshot_info_text = res.render_text(f"Snapshot #{self.selected+1}", 32)
-        surface.blit(snapshot_info_text, dest=(AREA_WIDTH//2 - snapshot_info_text.width//2, AREA_HEIGHT//2))
+        surface.blit(
+            res.render_text("Travel back in time, powered by Time Value Inc.!", 16)
+        )
+        surface.blit(
+            snapshot_previews[self.selected], dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
+        )
+        snapshot_info_text = res.render_text(f"{self.snapshot_times[self.selected]:.1f}s ago", 32)
+        surface.blit(
+            snapshot_info_text,
+            dest=(
+                AREA_WIDTH // 2 - snapshot_info_text.width // 2,
+                AREA_HEIGHT // 2 + preview_surf.height // 2,
+            ),
+        )
