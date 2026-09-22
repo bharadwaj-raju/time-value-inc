@@ -4,6 +4,9 @@ from itertools import groupby
 import pygame
 
 
+def lerp(a, b, t):
+    return a + (b - a) * t
+
 def point_in_polygon(x, y, poly):
     """
     Checks if a point (x, y) is inside a polygon defined by a sequence of points.
