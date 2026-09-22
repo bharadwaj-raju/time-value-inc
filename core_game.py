@@ -342,9 +342,14 @@ class SnapshotViewState(State):
         self.snapshot_times = []
         for i in range(len(self.core.state_snapshots))[::-1]:
             if i == len(self.core.state_snapshots) - 1:
-                self.snapshot_times.append(self.core.snapshot_timer.duration - self.core.snapshot_timer.time_left)
+                self.snapshot_times.append(
+                    self.core.snapshot_timer.duration
+                    - self.core.snapshot_timer.time_left
+                )
             else:
-                self.snapshot_times.append(self.snapshot_times[-1] + self.core.snapshot_timer.duration)
+                self.snapshot_times.append(
+                    self.snapshot_times[-1] + self.core.snapshot_timer.duration
+                )
         self.snapshot_times.reverse()
 
     def handle_event(self, event):
@@ -389,11 +394,23 @@ class SnapshotViewState(State):
         surface.blit(
             snapshot_previews[self.selected], dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
         )
-        snapshot_info_text = res.render_text(f"{self.snapshot_times[self.selected]:.1f}s ago", 32)
+        time_ago = round(self.snapshot_times[self.selected], 1)
+        snapshot_info_text = res.render_text(f"{time_ago:.1f}s ago", 32)
         surface.blit(
             snapshot_info_text,
             dest=(
                 AREA_WIDTH // 2 - snapshot_info_text.width // 2,
                 AREA_HEIGHT // 2 + preview_surf.height // 2,
+            ),
+        )
+        disclaimer_text = res.render_text(
+                f"Repayment: Your movement speed will be halved for the next {time_ago*1.25:.1f} seconds",
+                16,
+            )
+        surface.blit(
+            disclaimer_text,
+            dest=(
+                AREA_WIDTH // 2 - disclaimer_text.width // 2,
+                AREA_HEIGHT // 2 + preview_surf.height // 2 + 32
             ),
         )
