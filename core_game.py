@@ -338,6 +338,7 @@ class SnapshotViewState(State):
         render(self.current_surf, self.core.level, self.core.player, self.core.guards)
         self.blur_radius = 0
         self.darkening = 0
+        self.blurred_surf = None
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -346,7 +347,7 @@ class SnapshotViewState(State):
             elif event.key == pygame.K_LEFT:
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_RIGHT:
-                self.selected = min(len(self.core.state_snapshots), self.selected + 1)
+                self.selected = min(len(self.core.state_snapshots) - 1, self.selected + 1)
 
     def update(self, dt):
         if self.blur_radius < 10:
@@ -355,8 +356,13 @@ class SnapshotViewState(State):
             self.darkening += 10
 
     def draw(self, surface):
-        blurred_surf = pygame.transform.gaussian_blur(self.current_surf, radius=self.blur_radius)
-        surface.blit(blurred_surf)
+        if self.blurred_surf:
+            surface.blit(self.blurred_surf)
+        else:
+            blurred_surf = pygame.transform.gaussian_blur(self.current_surf, radius=self.blur_radius)
+            surface.blit(blurred_surf)
+            if self.blur_radius == 10:
+                self.blurred_surf = blurred_surf  # cache :)
         overlay = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, self.darkening))
         surface.blit(overlay)
@@ -366,5 +372,7 @@ class SnapshotViewState(State):
             render(preview_surf, self.core.level, snapshot[0], snapshot[1])
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
-        surface.blit(res.render_text(f"Travel back in time, powered by Time Value Inc.!", 16))
+        surface.blit(res.render_text("Travel back in time, powered by Time Value Inc.!", 16))
         surface.blit(snapshot_previews[self.selected], dest=(AREA_WIDTH//4, AREA_HEIGHT//4))
+        snapshot_info_text = res.render_text(f"Snapshot #{self.selected+1}", 32)
+        surface.blit(snapshot_info_text, dest=(AREA_WIDTH//2 - snapshot_info_text.width//2, AREA_HEIGHT//2))
