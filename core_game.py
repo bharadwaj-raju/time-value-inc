@@ -1,3 +1,4 @@
+from resources import res
 import copy
 import math
 from collections import deque
@@ -266,11 +267,34 @@ class Guard:
         )
 
 
+LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
+
+def render(surface, level: LevelMap, player: Player, guards: list[Guard]):
+    player_vis_poly = calculate_sweep_line(
+        player.pos.x, player.pos.y, level.wall_edges
+    )
+    surface.fill(BG_COLOR)
+    for guard in guards:
+        guard.draw(surface)
+    player.draw(surface)
+    if len(player_vis_poly) >= 3:
+        fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+        fog_surf.fill((10, 10, 15))
+        MASK_COLOR = (255, 0, 255)
+        pygame.gfxdraw.filled_polygon(fog_surf, player_vis_poly, MASK_COLOR)
+
+        fog_surf.set_colorkey(MASK_COLOR)
+
+        surface.blit(fog_surf, (0, 0))
+    for wall in level.walls:
+        pygame.draw.rect(surface, WALL_COLOR, wall, border_radius=4)
+        pygame.draw.rect(surface, BORDER_COLOR, wall, width=2, border_radius=4)
+
+
 class CoreGameState(State):
     def __init__(self, mgr: StateManager):
         super().__init__(mgr)
-        self.level_maps = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
-        self.level = self.level_maps[0]
+        self.level = LEVEL_MAPS[0]
 
         self.player = Player(self.level)
         self.guards = [Guard(route, self.level) for route in self.level.guard_routes]
@@ -285,7 +309,8 @@ class CoreGameState(State):
         self.snapshot_timer.start()
 
     def handle_event(self, event):
-        pass
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+            self.mgr.push(SnapshotViewState(self.mgr))
 
     def update(self, dt):
         self.guard_timer.update(dt)
@@ -293,26 +318,8 @@ class CoreGameState(State):
         self.player.update(dt, self.level.walls)
 
     def draw(self, surface):
-        player_vis_poly = calculate_sweep_line(
-            self.player.pos.x, self.player.pos.y, self.level.wall_edges
-        )
-        surface.fill(BG_COLOR)
-        for guard in self.guards:
-            guard.draw(surface)
-        self.player.draw(surface)
-        if len(player_vis_poly) >= 3:
-            fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-            fog_surf.fill((10, 10, 15))
-            MASK_COLOR = (255, 0, 255)
-            pygame.gfxdraw.filled_polygon(fog_surf, player_vis_poly, MASK_COLOR)
-
-            fog_surf.set_colorkey(MASK_COLOR)
-
-            surface.blit(fog_surf, (0, 0))
-        for wall in self.level.walls:
-            pygame.draw.rect(surface, WALL_COLOR, wall, border_radius=4)
-            pygame.draw.rect(surface, BORDER_COLOR, wall, width=2, border_radius=4)
-
+        render(surface, self.level, self.player, self.guards)
+        
     def snapshot(self):
         snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
         self.state_snapshots.append(snap)
@@ -320,3 +327,39 @@ class CoreGameState(State):
     def guard_step(self):
         for guard in self.guards:
             guard.update()
+
+class SnapshotViewState(State):
+    def __init__(self, mgr: StateManager):
+        super().__init__(mgr)
+        assert isinstance(self.mgr.stack[-1], CoreGameState)
+        self.core = self.mgr.stack[-1]
+        self.selected = len(self.core.state_snapshots) - 1
+        self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+        render(self.current_surf, self.core.level, self.core.player, self.core.guards)
+        self.blur_radius = 0
+        self.darkening = 0
+
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.mgr.pop()
+
+    def update(self, dt):
+        if self.blur_radius < 10:
+            self.blur_radius += 1
+        if self.darkening < 100:
+            self.darkening += 10
+
+    def draw(self, surface):
+        blurred_surf = pygame.transform.gaussian_blur(self.current_surf, radius=self.blur_radius)
+        surface.blit(blurred_surf)
+        overlay = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, self.darkening))
+        surface.blit(overlay)
+        snapshot_previews = []
+        for snapshot in self.core.state_snapshots:
+            preview_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+            render(preview_surf, self.core.level, snapshot[0], snapshot[1])
+            preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
+            snapshot_previews.append(preview_surf)
+        surface.blit(res.render_text(f"Travel back in time, powered by Time Value Inc.!", 32))
+        surface.blit(snapshot_previews[-1], dest=(AREA_WIDTH//4, AREA_HEIGHT//4))
