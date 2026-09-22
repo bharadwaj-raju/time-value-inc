@@ -25,6 +25,8 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_q:
             running = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_QUOTE:
+            print(state_mgr.stack)
         state_mgr.handle_event(event)
 
     state_mgr.update(dt)

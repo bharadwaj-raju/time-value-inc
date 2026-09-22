@@ -309,28 +309,17 @@ class CoreGameState(State):
         )
         self.snapshot_timer.start()
 
-        self.draw_player = True
-        self.player_blink_effect_timer = Timer(
-            duration=0.1, repeating=True, callback=self.player_blink_effect
-        )
-        self.player_blink_end_timer = Timer(
-            duration=0.5, repeating=False, callback=self.player_blink_end
-        )
-
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
             self.mgr.push(SnapshotViewState(self.mgr))
 
     def update(self, dt):
-        self.player_blink_effect_timer.update(dt)
-        self.player_blink_end_timer.update(dt)
-        if not self.player_blink_effect_timer.active:
-            self.guard_timer.update(dt)
-            self.snapshot_timer.update(dt)
-            self.player.update(dt, self.level.walls)
+        self.guard_timer.update(dt)
+        self.snapshot_timer.update(dt)
+        self.player.update(dt, self.level.walls)
 
     def draw(self, surface):
-        render(surface, self.level, self.player, self.guards, draw_player=self.draw_player)
+        render(surface, self.level, self.player, self.guards)
 
     def snapshot(self):
         snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
@@ -340,13 +329,30 @@ class CoreGameState(State):
         for guard in self.guards:
             guard.update()
 
-    def player_blink_effect(self):
+    
+class SnapshotRestoreEffectState(State):
+    def __init__(self, mgr: StateManager):
+        super().__init__(mgr)
+        assert isinstance(self.mgr.stack[-1], CoreGameState)
+        self.core = self.mgr.stack[-1]
+        self.draw_player = True
+        self.blink_timer = Timer(0.1, repeating=True, callback=self.blink)
+        self.end_effect_timer = Timer(0.5, repeating=False, callback=self.end)
+        self.blink_timer.start()
+        self.end_effect_timer.start()
+
+    def update(self, dt):
+        self.blink_timer.update(dt)
+        self.end_effect_timer.update(dt)
+
+    def draw(self, surface):
+        render(surface, self.core.level, self.core.player, self.core.guards, draw_player=self.draw_player)
+
+    def blink(self):
         self.draw_player = not self.draw_player
 
-    def player_blink_end(self):
-        self.player_blink_effect_timer.stop()
-        self.draw_player = True
-        self.player.vel = pygame.Vector2(0, 0)
+    def end(self):
+        self.mgr.pop()
 
 
 class SnapshotViewState(State):
@@ -385,11 +391,12 @@ class SnapshotViewState(State):
                 )
             elif event.key == pygame.K_RETURN:
                 player, guards = self.core.state_snapshots[self.selected]
-                self.core.player = copy.deepcopy(player)
+                player = copy.deepcopy(player)
+                player.vel = pygame.Vector2(0, 0)
+                self.core.player = player
                 self.core.guards = copy.deepcopy(guards)
-                self.core.player_blink_effect_timer.start()
-                self.core.player_blink_end_timer.start()
                 self.mgr.pop()
+                self.mgr.push(SnapshotRestoreEffectState(self.mgr))
 
     def update(self, dt):
         if self.blur_radius < 10:
