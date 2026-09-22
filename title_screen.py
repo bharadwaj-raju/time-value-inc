@@ -16,6 +16,7 @@ class TitleScreenState(State):
         self.regmark_surf = res.render_text("®", 32)
         self.tagline_surf = res.render_text("“Never heard of us? We can fix that!”", 16)
         self.enter_surf = res.render_text("Press [ENTER] to start", 32)
+        self.quit_surf = res.render_text("[Q]uit", 16)
 
     def draw(self, surface):
         surface.fill(BG_COLOR)
@@ -49,6 +50,11 @@ class TitleScreenState(State):
         surface.blit(
             self.enter_surf,
             dest=(surface.width // 2 - self.enter_surf.size[0] // 2, so_far + 128)
+        )
+
+        surface.blit(
+            self.quit_surf,
+            dest=(16, surface.height - self.quit_surf.height - 16)
         )
 
     def handle_event(self, event):
