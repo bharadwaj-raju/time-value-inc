@@ -340,8 +340,13 @@ class SnapshotViewState(State):
         self.darkening = 0
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.mgr.pop()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.mgr.pop()
+            elif event.key == pygame.K_LEFT:
+                self.selected = max(0, self.selected - 1)
+            elif event.key == pygame.K_RIGHT:
+                self.selected = min(len(self.core.state_snapshots), self.selected + 1)
 
     def update(self, dt):
         if self.blur_radius < 10:
@@ -361,5 +366,5 @@ class SnapshotViewState(State):
             render(preview_surf, self.core.level, snapshot[0], snapshot[1])
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
-        surface.blit(res.render_text(f"Travel back in time, powered by Time Value Inc.!", 32))
-        surface.blit(snapshot_previews[-1], dest=(AREA_WIDTH//4, AREA_HEIGHT//4))
+        surface.blit(res.render_text(f"Travel back in time, powered by Time Value Inc.!", 16))
+        surface.blit(snapshot_previews[self.selected], dest=(AREA_WIDTH//4, AREA_HEIGHT//4))
