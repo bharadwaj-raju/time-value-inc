@@ -7,7 +7,7 @@ import pygame
 import pygame.gfxdraw
 from PIL import Image
 
-from consts import AREA_HEIGHT, AREA_WIDTH, LEVELS_DIR
+from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, LEVELS_DIR
 from geometry import (
     adjacents_cardinal,
     calculate_sweep_line,
@@ -15,9 +15,8 @@ from geometry import (
     keys_to_vec,
     rect_edges,
 )
-from state import State, Timer
+from state import State, StateManager, Timer
 
-BG_COLOR = (24, 24, 28)
 PLAYER_COLOR = (70, 180, 255)
 GUARD_COLOR = (0, 0, 255)
 WALL_COLOR = (140, 140, 160)
@@ -268,7 +267,8 @@ class Guard:
 
 
 class CoreGameState(State):
-    def __init__(self):
+    def __init__(self, mgr: StateManager):
+        super().__init__(mgr)
         self.level_maps = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
         self.level = self.level_maps[0]
 

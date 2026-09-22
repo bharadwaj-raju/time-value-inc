@@ -1,3 +1,4 @@
+from title_screen import TitleScreenState
 import sys
 
 import pygame
@@ -16,7 +17,7 @@ clock = pygame.time.Clock()
 
 running = True
 state_mgr = StateManager()
-state_mgr.push(CoreGameState())
+state_mgr.push(TitleScreenState(state_mgr))
 while running:
     # Delta time in seconds
     dt = clock.tick(120) / 1000.0
