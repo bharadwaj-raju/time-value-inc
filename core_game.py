@@ -1,4 +1,3 @@
-from resources import res
 import copy
 import math
 from collections import deque
@@ -16,6 +15,7 @@ from geometry import (
     keys_to_vec,
     rect_edges,
 )
+from resources import res
 from state import State, StateManager, Timer
 
 PLAYER_COLOR = (70, 180, 255)
