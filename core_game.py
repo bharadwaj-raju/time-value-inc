@@ -270,12 +270,13 @@ class Guard:
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
 
-def render(surface, level: LevelMap, player: Player, guards: list[Guard]):
+def render(surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
     for guard in guards:
         guard.draw(surface)
-    player.draw(surface)
+    if draw_player:
+        player.draw(surface)
     if len(player_vis_poly) >= 3:
         fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
         fog_surf.fill((10, 10, 15))
@@ -302,22 +303,34 @@ class CoreGameState(State):
 
         self.guard_timer = Timer(duration=0.5, repeating=True, callback=self.guard_step)
         self.guard_timer.start()
+
         self.snapshot_timer = Timer(
             duration=0.5, repeating=True, callback=self.snapshot
         )
         self.snapshot_timer.start()
+
+        self.draw_player = True
+        self.player_blink_effect_timer = Timer(
+            duration=0.1, repeating=True, callback=self.player_blink_effect
+        )
+        self.player_blink_end_timer = Timer(
+            duration=0.5, repeating=False, callback=self.player_blink_end
+        )
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
             self.mgr.push(SnapshotViewState(self.mgr))
 
     def update(self, dt):
-        self.guard_timer.update(dt)
-        self.snapshot_timer.update(dt)
-        self.player.update(dt, self.level.walls)
+        self.player_blink_effect_timer.update(dt)
+        self.player_blink_end_timer.update(dt)
+        if not self.player_blink_effect_timer.active:
+            self.guard_timer.update(dt)
+            self.snapshot_timer.update(dt)
+            self.player.update(dt, self.level.walls)
 
     def draw(self, surface):
-        render(surface, self.level, self.player, self.guards)
+        render(surface, self.level, self.player, self.guards, draw_player=self.draw_player)
 
     def snapshot(self):
         snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
@@ -326,6 +339,14 @@ class CoreGameState(State):
     def guard_step(self):
         for guard in self.guards:
             guard.update()
+
+    def player_blink_effect(self):
+        self.draw_player = not self.draw_player
+
+    def player_blink_end(self):
+        self.player_blink_effect_timer.stop()
+        self.draw_player = True
+        self.player.vel = pygame.Vector2(0, 0)
 
 
 class SnapshotViewState(State):
@@ -362,6 +383,13 @@ class SnapshotViewState(State):
                 self.selected = min(
                     len(self.core.state_snapshots) - 1, self.selected + 1
                 )
+            elif event.key == pygame.K_RETURN:
+                player, guards = self.core.state_snapshots[self.selected]
+                self.core.player = copy.deepcopy(player)
+                self.core.guards = copy.deepcopy(guards)
+                self.core.player_blink_effect_timer.start()
+                self.core.player_blink_end_timer.start()
+                self.mgr.pop()
 
     def update(self, dt):
         if self.blur_radius < 10:
@@ -388,13 +416,11 @@ class SnapshotViewState(State):
             render(preview_surf, self.core.level, snapshot[0], snapshot[1])
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
-        powered_by_text = res.render_text("Travel back in time, powered by Time Value Inc.!", 16)
+        powered_by_text = res.render_text(
+            "Travel back in time, powered by Time Value Inc.!", 16
+        )
         surface.blit(
-            powered_by_text,
-            dest = (
-                AREA_WIDTH // 2 - powered_by_text.width // 2,
-                32
-            )
+            powered_by_text, dest=(AREA_WIDTH // 2 - powered_by_text.width // 2, 32)
         )
         surface.blit(
             snapshot_previews[self.selected], dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
@@ -409,13 +435,13 @@ class SnapshotViewState(State):
             ),
         )
         disclaimer_text = res.render_text(
-                f"Repayment: Your movement speed will be halved for the next {time_ago*1.25:.1f} seconds",
-                16,
-            )
+            f"Repayment: Your movement speed will be halved for the next {time_ago * 1.25:.1f} seconds\n\n[ENTER] to confirm      [ESC] to cancel",
+            16,
+        )
         surface.blit(
             disclaimer_text,
             dest=(
                 AREA_WIDTH // 2 - disclaimer_text.width // 2,
-                AREA_HEIGHT // 2 + preview_surf.height // 2 + 48
+                AREA_HEIGHT // 2 + preview_surf.height // 2 + 48,
             ),
         )
