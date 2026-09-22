@@ -388,8 +388,13 @@ class SnapshotViewState(State):
             render(preview_surf, self.core.level, snapshot[0], snapshot[1])
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
+        powered_by_text = res.render_text("Travel back in time, powered by Time Value Inc.!", 16)
         surface.blit(
-            res.render_text("Travel back in time, powered by Time Value Inc.!", 16)
+            powered_by_text,
+            dest = (
+                AREA_WIDTH // 2 - powered_by_text.width // 2,
+                32
+            )
         )
         surface.blit(
             snapshot_previews[self.selected], dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
@@ -411,6 +416,6 @@ class SnapshotViewState(State):
             disclaimer_text,
             dest=(
                 AREA_WIDTH // 2 - disclaimer_text.width // 2,
-                AREA_HEIGHT // 2 + preview_surf.height // 2 + 32
+                AREA_HEIGHT // 2 + preview_surf.height // 2 + 48
             ),
         )
