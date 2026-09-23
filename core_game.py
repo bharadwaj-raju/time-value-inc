@@ -1,4 +1,3 @@
-import copy
 import math
 from collections import deque
 from typing import Self
@@ -198,6 +197,13 @@ class Player(MovableEntity):
         super().__init__(*level.player_start, radius=level.scale_factor // 2)
         self.level = level
 
+    def snapshot(self):
+        return (self.pos.copy(),)
+
+    def load_snapshot(self, snapshot):
+        pos, = snapshot
+        self.pos = pos.copy()
+
     def update(self, dt, walls):
         keys = pygame.key.get_pressed()
         direction = keys_to_vec(keys)
@@ -222,8 +228,14 @@ class Guard:
         self.last_visited = {tile: 0 for tile in route}
         self.map_pos = next(iter(route))
         self.t = 0
-        self.facing = None
         self.update()
+
+    def snapshot(self):
+        return (self.map_pos, self.t, self.facing.copy(), self.last_visited.copy())
+
+    def load_snapshot(self, snapshot):
+        map_pos, t, facing, last_visited = snapshot
+        self.map_pos, self.t, self.facing, self.last_visited = map_pos, t, facing.copy(), last_visited.copy()
 
     def update(self):
         # try to go to the closest tile which hasn't been stepped on for the longest
@@ -307,7 +319,7 @@ class CoreGameState(State):
         self.guard_timer.start()
 
         self.snapshot_timer = Timer(
-            duration=0.5, repeating=True, callback=self.snapshot
+            duration=0.5, repeating=True, callback=self.take_snapshot
         )
         self.snapshot_timer.start()
 
@@ -355,8 +367,8 @@ class CoreGameState(State):
                 ),
             )
 
-    def snapshot(self):
-        snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
+    def take_snapshot(self):
+        snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
         self.state_snapshots.append(snap)
 
     def guard_step(self):
@@ -433,12 +445,11 @@ class SnapshotViewState(State):
                     len(self.core.state_snapshots) - 1, self.selected + 1
                 )
             elif event.key == pygame.K_RETURN:
-                player, guards = self.core.state_snapshots[self.selected]
-                player = copy.deepcopy(player)
-                player.vel = pygame.Vector2(0, 0)
+                player_snap, guards_snap = self.core.state_snapshots[self.selected]
                 repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
-                self.core.player = player
-                self.core.guards = copy.deepcopy(guards)
+                self.core.player.load_snapshot(player_snap)
+                for guard, guard_snap in zip(self.core.guards, guards_snap):
+                    guard.load_snapshot(guard_snap)
                 if self.core.debuff:
                     # debts stack
                     self.core.end_debuff_timer.duration += repayment
