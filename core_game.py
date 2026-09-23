@@ -270,7 +270,9 @@ class Guard:
 LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
 
-def render(surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True):
+def render(
+    surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True
+):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
     for guard in guards:
@@ -310,7 +312,11 @@ class CoreGameState(State):
         self.snapshot_timer.start()
 
         self.debuff = False
-        self.end_debuff_timer = Timer(duration=1.5, repeating=False, callback=self.end_debuff)
+        self.end_debuff_timer = Timer(
+            duration=1.5, repeating=False, callback=self.end_debuff
+        )
+
+        self.repayment_bar_label = res.render_text("REPAYMENT", 16)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
@@ -324,6 +330,30 @@ class CoreGameState(State):
 
     def draw(self, surface):
         render(surface, self.level, self.player, self.guards)
+        surface.blit(
+            self.repayment_bar_label,
+            dest=(
+                AREA_WIDTH - 116 - self.repayment_bar_label.width - 8,
+                AREA_HEIGHT + 16,
+            ),
+        )
+        pygame.draw.rect(
+            surface, (255, 255, 255), (AREA_WIDTH - 116, AREA_HEIGHT + 16, 100, 16), 2
+        )
+        if self.debuff:
+            pygame.draw.rect(
+                surface,
+                (255, 255, 255),
+                (
+                    AREA_WIDTH - 116,
+                    AREA_HEIGHT + 16,
+                    100
+                    * (
+                        self.end_debuff_timer.time_left / self.end_debuff_timer.duration
+                    ),
+                    16,
+                ),
+            )
 
     def snapshot(self):
         snap = (copy.deepcopy(self.player), copy.deepcopy(self.guards))
@@ -336,7 +366,7 @@ class CoreGameState(State):
     def end_debuff(self):
         self.debuff = False
 
-    
+
 class SnapshotRestoreEffectState(State):
     def __init__(self, mgr: StateManager):
         super().__init__(mgr)
@@ -353,7 +383,13 @@ class SnapshotRestoreEffectState(State):
         self.end_effect_timer.update(dt)
 
     def draw(self, surface):
-        render(surface, self.core.level, self.core.player, self.core.guards, draw_player=self.draw_player)
+        render(
+            surface,
+            self.core.level,
+            self.core.player,
+            self.core.guards,
+            draw_player=self.draw_player,
+        )
 
     def blink(self):
         self.draw_player = not self.draw_player
@@ -403,9 +439,13 @@ class SnapshotViewState(State):
                 repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
                 self.core.player = player
                 self.core.guards = copy.deepcopy(guards)
-                self.core.debuff = True
-                self.core.end_debuff_timer.duration = repayment
-                self.core.end_debuff_timer.start()
+                if self.core.debuff:
+                    # debts stack
+                    self.core.end_debuff_timer.duration += repayment
+                else:
+                    self.core.debuff = True
+                    self.core.end_debuff_timer.duration = repayment
+                    self.core.end_debuff_timer.start()
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
 
