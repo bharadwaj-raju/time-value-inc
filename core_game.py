@@ -283,6 +283,7 @@ class CoreGameState(State):
                 AREA_HEIGHT + 16,
             ),
         )
+        res.backintime_icon.draw(surface, dest=(0, AREA_HEIGHT + 16), scale=3)
         pygame.draw.rect(
             surface, (255, 255, 255), (AREA_WIDTH - 116, AREA_HEIGHT + 16, 100, 16), 2
         )
@@ -437,9 +438,10 @@ class SnapshotViewState(State):
         overlay = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, self.darkening))
         surface.blit(overlay)
-        if not self.snapshots: 
+        if not self.snapshots:
             no_snaps_text = res.render_text(
-                "No snapshots yet! They’re taken every half a second, so please wait just a bit.", 16
+                "No snapshots yet! They’re taken every half a second, so please wait just a bit.",
+                16,
             )
             surface.blit(
                 no_snaps_text, dest=(AREA_WIDTH // 2 - no_snaps_text.width // 2, 32)

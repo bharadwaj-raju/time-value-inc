@@ -1,6 +1,7 @@
 import pygame
 
 from consts import ROOT
+from icon import Icon
 
 FONT_FILE = ROOT / "unifont-subset.ttf"
 
@@ -10,6 +11,10 @@ class Resources:
     font32: pygame.font.Font | None = None
     font16: pygame.font.Font | None = None
     font8: pygame.font.Font | None = None
+
+    backintime_icon = Icon(ROOT / "icons" / "backintime.pbm")
+    rewind_icon = Icon(ROOT / "icons" / "rewind.pbm")
+    ff_icon = Icon(ROOT / "icons" / "ff.pbm")
 
     @classmethod
     def load(cls):
