@@ -430,6 +430,8 @@ class SnapshotViewState(State):
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
+        self.left_arrow = res.render_text("←", 128)
+        self.right_arrow = res.render_text("→", 128)
         self.because_caught = because_caught
 
     def handle_event(self, event):
@@ -508,6 +510,10 @@ class SnapshotViewState(State):
             powered_by_text, dest=(AREA_WIDTH // 2 - powered_by_text.width // 2, 32)
         )
         surface.blit(snapshot_preview, dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4))
+        if self.selected != 0:
+            surface.blit(self.left_arrow, dest=(AREA_WIDTH // 4 - 128, AREA_HEIGHT // 2 - self.left_arrow.height // 2))
+        if self.selected != len(self.snapshots) - 1:
+            surface.blit(self.right_arrow, dest=(3 * AREA_WIDTH // 4 + 64, AREA_HEIGHT // 2 - self.left_arrow.height // 2))
         time_ago = round(self.snapshot_times[self.selected], 1)
         snapshot_info_text = res.render_text(f"{time_ago:.1f}s ago", 32)
         surface.blit(
