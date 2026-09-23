@@ -256,6 +256,8 @@ class CoreGameState(State):
         )
 
         self.repayment_bar_label = res.render_text("REPAYMENT", 16)
+        self.ff_bar_label = res.render_text("SPEEDUP", 16)
+        self.slowdown_bar_label = res.render_text("SLOWDOWN", 16)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
@@ -272,37 +274,56 @@ class CoreGameState(State):
         self.end_debuff_timer.update(dt)
         self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
 
+    def draw_countdown(self, surface, y, label, fraction):
+        surface.blit(
+            label,
+            dest=(
+                AREA_WIDTH - 116 - label.width - 8,
+                y,
+            ),
+        )
+        pygame.draw.rect(surface, (255, 255, 255), (AREA_WIDTH - 116, y, 100, 16), 2)
+        pygame.draw.rect(
+            surface,
+            (255, 255, 255),
+            (
+                AREA_WIDTH - 116,
+                y,
+                100 * fraction,
+                16,
+            ),
+        )
+
     def draw(self, surface):
         if any(guard.caught for guard in self.guards):
             return
         render(surface, self.level, self.player, self.guards)
-        surface.blit(
+        res.backintime_icon.draw(surface, dest=(16, AREA_HEIGHT + 16), scale=3)
+        self.draw_countdown(
+            surface,
+            AREA_HEIGHT + 16,
             self.repayment_bar_label,
-            dest=(
-                AREA_WIDTH - 116 - self.repayment_bar_label.width - 8,
-                AREA_HEIGHT + 16,
-            ),
+            0.0
+            if not self.debuff or self.end_debuff_timer.duration == 0.0
+            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
         )
-        res.backintime_icon.draw(surface, dest=(0, AREA_HEIGHT + 16), scale=3)
-        pygame.draw.rect(
-            surface, (255, 255, 255), (AREA_WIDTH - 116, AREA_HEIGHT + 16, 100, 16), 2
+        self.draw_countdown(
+            surface,
+            AREA_HEIGHT + 16 + 4 + 16,
+            self.ff_bar_label,
+            0.0
+            if not self.debuff or self.end_debuff_timer.duration == 0.0
+            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
         )
-        if self.debuff:
-            try:
-                frac = self.end_debuff_timer.time_left / self.end_debuff_timer.duration
-                pygame.draw.rect(
-                    surface,
-                    (255, 255, 255),
-                    (
-                        AREA_WIDTH - 116,
-                        AREA_HEIGHT + 16,
-                        100 * frac,
-                        16,
-                    ),
-                )
-            except ZeroDivisionError:
-                pass
-
+        self.draw_countdown(
+            surface,
+            AREA_HEIGHT + 16 + 4 + 16 + 4 + 16,
+            self.slowdown_bar_label,
+            0.0
+            if not self.debuff or self.end_debuff_timer.duration == 0.0
+            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
+        )
+        
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
         self.state_snapshots.append(snap)
