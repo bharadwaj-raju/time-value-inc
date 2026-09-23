@@ -12,6 +12,7 @@ from geometry import (
     calculate_sweep_line,
     generate_cone_boundaries,
     keys_to_vec,
+    point_in_polygon,
     rect_edges,
 )
 from resources import res
@@ -22,6 +23,7 @@ GUARD_COLOR = (0, 0, 255)
 WALL_COLOR = (140, 140, 160)
 BORDER_COLOR = (60, 60, 75)
 GUARD_VIS_COLOR = (255, 255, 0, 128)
+GUARD_VIS_ALERT_COLOR = (255, 100, 0, 128)
 
 
 class LevelMap:
@@ -228,6 +230,7 @@ class Guard:
         self.last_visited = {tile: 0 for tile in route}
         self.map_pos = next(iter(route))
         self.t = 0
+        self.caught = False
         self.update()
 
     def snapshot(self):
@@ -250,7 +253,7 @@ class Guard:
         )
         self.calculate_vis()
 
-    def update(self):
+    def update(self, player_pos: tuple[int, int] | None = None):
         # try to go to the closest tile which hasn't been stepped on for the longest
         adj = [p for p in adjacents_cardinal(*self.map_pos) if p in self.route]
         next_pos = min(adj, key=lambda p: self.last_visited[p])
@@ -261,6 +264,8 @@ class Guard:
         self.last_visited[next_pos] = self.t
         self.facing = next_pos_v - prev_pos_v
         self.calculate_vis()
+        if player_pos:
+            self.check_caught(player_pos)
 
     def calculate_vis(self):
         screen_pos = (
@@ -278,14 +283,23 @@ class Guard:
             screen_pos[0], screen_pos[1], self.level.wall_edges + cone_edges
         )
 
+    def check_caught(self, player_pos: tuple[int, int]):
+        for pos in (
+            player_pos,
+            *adjacents_cardinal(*player_pos, by=self.radius // 2),
+        ):
+            if point_in_polygon(*pos, self.vis_poly_points):
+                self.caught = True
+
     def draw(self, surface):
         screen_pos = (
             self.map_pos[0] * self.scale_factor + self.radius,
             self.map_pos[1] * self.scale_factor + self.radius,
         )
         shape_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
-        pygame.gfxdraw.aapolygon(shape_surf, self.vis_poly_points, GUARD_VIS_COLOR)
-        pygame.gfxdraw.filled_polygon(shape_surf, self.vis_poly_points, GUARD_VIS_COLOR)
+        color = GUARD_VIS_ALERT_COLOR if self.caught else GUARD_VIS_COLOR
+        pygame.gfxdraw.aapolygon(shape_surf, self.vis_poly_points, color)
+        pygame.gfxdraw.filled_polygon(shape_surf, self.vis_poly_points, color)
         surface.blit(shape_surf)
         pygame.draw.circle(
             surface,
@@ -352,6 +366,8 @@ class CoreGameState(State):
 
     def update(self, dt):
         self.guard_timer.update(dt)
+        for guard in self.guards:
+            guard.check_caught((int(self.player.pos.x), int(self.player.pos.y)))
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
         self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
@@ -369,19 +385,20 @@ class CoreGameState(State):
             surface, (255, 255, 255), (AREA_WIDTH - 116, AREA_HEIGHT + 16, 100, 16), 2
         )
         if self.debuff:
-            pygame.draw.rect(
-                surface,
-                (255, 255, 255),
-                (
-                    AREA_WIDTH - 116,
-                    AREA_HEIGHT + 16,
-                    100
-                    * (
-                        self.end_debuff_timer.time_left / self.end_debuff_timer.duration
+            try:
+                frac = self.end_debuff_timer.time_left / self.end_debuff_timer.duration
+                pygame.draw.rect(
+                    surface,
+                    (255, 255, 255),
+                    (
+                        AREA_WIDTH - 116,
+                        AREA_HEIGHT + 16,
+                        100 * frac,
+                        16,
                     ),
-                    16,
-                ),
-            )
+                )
+            except ZeroDivisionError:
+                pass
 
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
@@ -389,10 +406,32 @@ class CoreGameState(State):
 
     def guard_step(self):
         for guard in self.guards:
-            guard.update()
+            guard.caught = False
+            guard.update((int(self.player.pos.x), int(self.player.pos.y)))
+            if guard.caught:
+                self.mgr.push(CaughtHoldEffectState(self.mgr))
 
     def end_debuff(self):
         self.debuff = False
+
+
+class CaughtHoldEffectState(State):
+    def __init__(self, mgr: StateManager):
+        super().__init__(mgr)
+        assert isinstance(self.mgr.stack[-1], CoreGameState)
+        self.core = self.mgr.stack[-1]
+        self.end_effect_timer = Timer(0.5, repeating=False, callback=self.end)
+        self.end_effect_timer.start()
+
+    def update(self, dt):
+        self.end_effect_timer.update(dt)
+
+    def draw(self, surface):
+        render(surface, self.core.level, self.core.player, self.core.guards)
+
+    def end(self):
+        self.mgr.pop()
+        self.mgr.push(SnapshotViewState(self.mgr))
 
 
 class SnapshotRestoreEffectState(State):
@@ -431,15 +470,10 @@ class SnapshotViewState(State):
         super().__init__(mgr)
         assert isinstance(self.mgr.stack[-1], CoreGameState)
         self.core = self.mgr.stack[-1]
-        self.selected = len(self.core.state_snapshots) - 1
-        self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        render(self.current_surf, self.core.level, self.core.player, self.core.guards)
-        self.blur_radius = 0
-        self.darkening = 0
-        self.blurred_surf = None
+        self.snapshots = self.core.state_snapshots
         self.snapshot_times = []
-        for i in range(len(self.core.state_snapshots))[::-1]:
-            if i == len(self.core.state_snapshots) - 1:
+        for i in range(len(self.snapshots))[::-1]:
+            if i == len(self.snapshots) - 1:
                 self.snapshot_times.append(
                     self.core.snapshot_timer.duration
                     - self.core.snapshot_timer.time_left
@@ -449,6 +483,15 @@ class SnapshotViewState(State):
                     self.snapshot_times[-1] + self.core.snapshot_timer.duration
                 )
         self.snapshot_times.reverse()
+        if round(self.snapshot_times[-1], 1) == 0.0:
+            self.snapshot_times.pop()
+            self.snapshots.pop()
+        self.selected = len(self.snapshots) - 1
+        self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+        render(self.current_surf, self.core.level, self.core.player, self.core.guards)
+        self.blur_radius = 0
+        self.darkening = 0
+        self.blurred_surf = None
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -457,11 +500,9 @@ class SnapshotViewState(State):
             elif event.key == pygame.K_LEFT:
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_RIGHT:
-                self.selected = min(
-                    len(self.core.state_snapshots) - 1, self.selected + 1
-                )
+                self.selected = min(len(self.snapshots) - 1, self.selected + 1)
             elif event.key == pygame.K_RETURN:
-                player_snap, guards_snap = self.core.state_snapshots[self.selected]
+                player_snap, guards_snap = self.snapshots[self.selected]
                 repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
                 self.core.player.load_snapshot(player_snap)
                 self.core.player.vel = pygame.Vector2(0.0, 0.0)
@@ -497,10 +538,12 @@ class SnapshotViewState(State):
         overlay.fill((0, 0, 0, self.darkening))
         surface.blit(overlay)
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        player_snap, guards_snap = self.core.state_snapshots[self.selected]
+        player_snap, guards_snap = self.snapshots[self.selected]
         player = Player(self.core.level)
         player.load_snapshot(player_snap)
-        guards = [Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap]
+        guards = [
+            Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap
+        ]
         for guard, guard_snap in zip(guards, guards_snap):
             guard.load_snapshot(guard_snap)
         render(snapshot_preview, self.core.level, player, guards)
@@ -511,9 +554,7 @@ class SnapshotViewState(State):
         surface.blit(
             powered_by_text, dest=(AREA_WIDTH // 2 - powered_by_text.width // 2, 32)
         )
-        surface.blit(
-            snapshot_preview, dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
-        )
+        surface.blit(snapshot_preview, dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4))
         time_ago = round(self.snapshot_times[self.selected], 1)
         snapshot_info_text = res.render_text(f"{time_ago:.1f}s ago", 32)
         surface.blit(

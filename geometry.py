@@ -111,8 +111,8 @@ def keys_to_vec(keys) -> pygame.Vector2:
     return input_dir
 
 
-def adjacents_cardinal(x, y):
-    return [(x + 1, y), (x, y + 1), (x - 1, y), (x, y - 1)]
+def adjacents_cardinal(x, y, by=1) -> list[tuple[int, int]]:
+    return [(x + by, y), (x, y + by), (x - by, y), (x, y - by)]
 
 
 # thanks Nicky Case :D
