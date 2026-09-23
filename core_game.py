@@ -255,14 +255,10 @@ class CoreGameState(State):
             duration=0.0, repeating=False, callback=self.end_debuff
         )
 
-        self.repayment_bar_label = res.render_text("REPAYMENT", 16)
-        self.ff_bar_label = res.render_text("SPEEDUP", 16)
-        self.slowdown_bar_label = res.render_text("SLOWDOWN", 16)
+        self.repayment_label = res.render_text("REPAYMENT", 16)
 
-        self.slowdown = False
-        self.end_slowdown_timer = Timer(
-            duration=1.5, repeating=False, callback=self.end_slowdown
-        )
+        self.backinttime_key_label = res.render_text("BACK IN TIME\n[B]", 16)
+        self.speedup_key_label = res.render_text("SPEEDUP\n[S]", 16)
 
         self.speedup = False
         self.end_speedup_timer = Timer(
@@ -274,23 +270,14 @@ class CoreGameState(State):
             if event.key == pygame.K_b:
                 self.mgr.push(SnapshotViewState(self.mgr))
             elif event.key == pygame.K_s and not (
-                self.debuff or self.speedup or self.slowdown
-            ):
-                self.slowdown = True
-                self.end_slowdown_timer.start()
-            elif event.key == pygame.K_f and not (
-                self.debuff or self.speedup or self.slowdown
+                self.debuff or self.speedup
             ):
                 self.speedup = True
                 self.end_speedup_timer.start()
 
     def update(self, dt):
-        player_dt = dt
-        if self.debuff:
-            player_dt /= 2
-        elif self.speedup:
-            player_dt *= 2
-        enemy_dt = (dt / 2) if self.slowdown else dt
+        player_dt = (dt / 2) if self.debuff else dt
+        enemy_dt = (dt / 2) if self.speedup else dt
         self.guard_timer.update(enemy_dt)
         for guard in self.guards:
             guard.check_caught((int(self.player.pos.x), int(self.player.pos.y)))
@@ -299,24 +286,16 @@ class CoreGameState(State):
                 return
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
-        self.end_slowdown_timer.update(dt)
         self.end_speedup_timer.update(dt)
         self.player.update(player_dt, self.level.walls)
 
-    def draw_countdown(self, surface, y, label, fraction):
-        surface.blit(
-            label,
-            dest=(
-                AREA_WIDTH - 116 - label.width - 8,
-                y,
-            ),
-        )
-        pygame.draw.rect(surface, (255, 255, 255), (AREA_WIDTH - 116, y, 100, 16), 2)
+    def draw_countdown(self, surface, x, y, fraction):
+        pygame.draw.rect(surface, (255, 255, 255), (x, y, 100, 16), 2)
         pygame.draw.rect(
             surface,
             (255, 255, 255),
             (
-                AREA_WIDTH - 116,
+                x,
                 y,
                 100 * fraction,
                 16,
@@ -327,30 +306,32 @@ class CoreGameState(State):
         if any(guard.caught for guard in self.guards):
             return
         render(surface, self.level, self.player, self.guards)
-        res.backintime_icon.draw(surface, dest=(16, AREA_HEIGHT + 16), scale=3)
+        res.backintime_icon.draw(surface, dest=(32, AREA_HEIGHT + 16), scale=3)
+        surface.blit(self.backinttime_key_label, dest=(32 + 16*3 + 8, AREA_HEIGHT + 16 + 8))
+        res.ff_icon.draw(surface, dest=(256, AREA_HEIGHT + 16), scale=3)
+        surface.blit(self.speedup_key_label, dest=(256 + 16*3 + 8, AREA_HEIGHT + 16 + 8))
+        surface.blit(
+            self.repayment_label,
+            dest=(
+                AREA_WIDTH - 116 - self.repayment_label.width - 8,
+                AREA_HEIGHT + 32 + 4,
+            ),
+        )
         self.draw_countdown(
             surface,
-            AREA_HEIGHT + 16,
-            self.repayment_bar_label,
+            AREA_WIDTH - 100 - 16,
+            AREA_HEIGHT + 32 + 4,
             0.0
             if not self.debuff or self.end_debuff_timer.duration == 0.0
             else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
         )
         self.draw_countdown(
             surface,
-            AREA_HEIGHT + 16 + 4 + 16,
-            self.ff_bar_label,
+            256 + 8,
+            AREA_HEIGHT + 32 + 8 + 32,
             0.0
             if not self.speedup
             else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
-        )
-        self.draw_countdown(
-            surface,
-            AREA_HEIGHT + 16 + 4 + 16 + 4 + 16,
-            self.slowdown_bar_label,
-            0.0
-            if not self.slowdown
-            else self.end_slowdown_timer.time_left / self.end_slowdown_timer.duration,
         )
 
     def take_snapshot(self):
@@ -364,12 +345,6 @@ class CoreGameState(State):
     def end_debuff(self):
         self.debuff = False
         self.end_debuff_timer.duration = 0.0
-
-    def end_slowdown(self):
-        self.slowdown = False
-        self.debuff = True
-        self.end_debuff_timer.duration += self.end_slowdown_timer.duration
-        self.end_debuff_timer.start()
 
     def end_speedup(self):
         self.speedup = False
