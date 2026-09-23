@@ -252,7 +252,7 @@ class CoreGameState(State):
 
         self.debuff = False
         self.end_debuff_timer = Timer(
-            duration=1.5, repeating=False, callback=self.end_debuff
+            duration=0.0, repeating=False, callback=self.end_debuff
         )
 
         self.repayment_bar_label = res.render_text("REPAYMENT", 16)
@@ -363,17 +363,18 @@ class CoreGameState(State):
 
     def end_debuff(self):
         self.debuff = False
+        self.end_debuff_timer.duration = 0.0
 
     def end_slowdown(self):
         self.slowdown = False
         self.debuff = True
-        self.end_debuff_timer.duration = self.end_slowdown_timer.duration
+        self.end_debuff_timer.duration += self.end_slowdown_timer.duration
         self.end_debuff_timer.start()
 
     def end_speedup(self):
         self.speedup = False
         self.debuff = True
-        self.end_debuff_timer.duration = self.end_speedup_timer.duration
+        self.end_debuff_timer.duration += self.end_speedup_timer.duration
         self.end_debuff_timer.start()
 
 
