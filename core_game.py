@@ -309,6 +309,9 @@ class CoreGameState(State):
         )
         self.snapshot_timer.start()
 
+        self.debuff = False
+        self.end_debuff_timer = Timer(duration=1.5, repeating=False, callback=self.end_debuff)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
             self.mgr.push(SnapshotViewState(self.mgr))
@@ -316,7 +319,8 @@ class CoreGameState(State):
     def update(self, dt):
         self.guard_timer.update(dt)
         self.snapshot_timer.update(dt)
-        self.player.update(dt, self.level.walls)
+        self.end_debuff_timer.update(dt)
+        self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
 
     def draw(self, surface):
         render(surface, self.level, self.player, self.guards)
@@ -328,6 +332,9 @@ class CoreGameState(State):
     def guard_step(self):
         for guard in self.guards:
             guard.update()
+
+    def end_debuff(self):
+        self.debuff = False
 
     
 class SnapshotRestoreEffectState(State):
@@ -393,8 +400,12 @@ class SnapshotViewState(State):
                 player, guards = self.core.state_snapshots[self.selected]
                 player = copy.deepcopy(player)
                 player.vel = pygame.Vector2(0, 0)
+                repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
                 self.core.player = player
                 self.core.guards = copy.deepcopy(guards)
+                self.core.debuff = True
+                self.core.end_debuff_timer.duration = repayment
+                self.core.end_debuff_timer.start()
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
 
