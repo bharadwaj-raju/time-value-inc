@@ -471,7 +471,8 @@ class SnapshotViewState(State):
         snapshot_previews = []
         for snapshot in self.core.state_snapshots:
             preview_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-            render(preview_surf, self.core.level, snapshot[0], snapshot[1])
+            player, guards = snapshot
+            render(preview_surf, self.core.level, player, guards)
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
         powered_by_text = res.render_text(
