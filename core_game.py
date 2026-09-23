@@ -201,7 +201,7 @@ class Player(MovableEntity):
         return (self.pos.copy(),)
 
     def load_snapshot(self, snapshot):
-        pos, = snapshot
+        (pos,) = snapshot
         self.pos = pos.copy()
 
     def update(self, dt, walls):
@@ -231,11 +231,24 @@ class Guard:
         self.update()
 
     def snapshot(self):
-        return (self.map_pos, self.t, self.facing.copy(), self.last_visited.copy())
+        return (
+            self.route,
+            self.map_pos,
+            self.t,
+            self.facing.copy(),
+            self.last_visited.copy(),
+        )
 
     def load_snapshot(self, snapshot):
-        map_pos, t, facing, last_visited = snapshot
-        self.map_pos, self.t, self.facing, self.last_visited = map_pos, t, facing.copy(), last_visited.copy()
+        route, map_pos, t, facing, last_visited = snapshot
+        self.route, self.map_pos, self.t, self.facing, self.last_visited = (
+            route,
+            map_pos,
+            t,
+            facing.copy(),
+            last_visited.copy(),
+        )
+        self.calculate_vis()
 
     def update(self):
         # try to go to the closest tile which hasn't been stepped on for the longest
@@ -247,6 +260,9 @@ class Guard:
         self.t += 1
         self.last_visited[next_pos] = self.t
         self.facing = next_pos_v - prev_pos_v
+        self.calculate_vis()
+
+    def calculate_vis(self):
         screen_pos = (
             self.map_pos[0] * self.scale_factor + self.radius,
             self.map_pos[1] * self.scale_factor + self.radius,
@@ -448,6 +464,7 @@ class SnapshotViewState(State):
                 player_snap, guards_snap = self.core.state_snapshots[self.selected]
                 repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
                 self.core.player.load_snapshot(player_snap)
+                self.core.player.vel = pygame.Vector2(0.0, 0.0)
                 for guard, guard_snap in zip(self.core.guards, guards_snap):
                     guard.load_snapshot(guard_snap)
                 if self.core.debuff:
@@ -482,7 +499,12 @@ class SnapshotViewState(State):
         snapshot_previews = []
         for snapshot in self.core.state_snapshots:
             preview_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-            player, guards = snapshot
+            player_snap, guards_snap = snapshot
+            player = Player(self.core.level)
+            player.load_snapshot(player_snap)
+            guards = [Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap]
+            for guard, guard_snap in zip(guards, guards_snap):
+                guard.load_snapshot(guard_snap)
             render(preview_surf, self.core.level, player, guards)
             preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
             snapshot_previews.append(preview_surf)
