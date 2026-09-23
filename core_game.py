@@ -6,6 +6,7 @@ import pygame.gfxdraw
 
 from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, LEVELS_DIR
 from geometry import (
+    adjacents,
     adjacents_cardinal,
     calculate_sweep_line,
     generate_cone_boundaries,
@@ -182,7 +183,7 @@ class Guard:
         self.caught = False
         for pos in (
             player_pos,
-            *adjacents_cardinal(*player_pos, by=self.radius // 2),
+            *adjacents(*player_pos, by=self.radius // 2),
         ):
             if point_in_polygon(*pos, self.vis_poly_points):
                 self.caught = True

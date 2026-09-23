@@ -114,6 +114,13 @@ def keys_to_vec(keys) -> pygame.Vector2:
 def adjacents_cardinal(x, y, by=1) -> list[tuple[int, int]]:
     return [(x + by, y), (x, y + by), (x - by, y), (x, y - by)]
 
+def adjacents(x, y, by=1) -> list[tuple[int, int]]:
+    adj = adjacents_cardinal(x, y, by)
+    by /= math.sqrt(2)
+    for px, py in [(x + by, y + by), (x - by, y + by), (x + by, y - by), (x - by, y - by)]:
+        adj.append((round(px), round(py)))
+    return adj
+
 
 # thanks Nicky Case :D
 def ray_intersect(ray, segment):
