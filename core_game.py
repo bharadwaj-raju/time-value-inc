@@ -265,7 +265,6 @@ class CoreGameState(State):
         for guard in self.guards:
             guard.check_caught((int(self.player.pos.x), int(self.player.pos.y)))
             if guard.caught:
-                print(self.mgr.stack)
                 self.mgr.push(CaughtHoldEffectState(self.mgr))
                 return
         self.snapshot_timer.update(dt)
@@ -273,6 +272,8 @@ class CoreGameState(State):
         self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
 
     def draw(self, surface):
+        if any(guard.caught for guard in self.guards):
+            return
         render(surface, self.level, self.player, self.guards)
         surface.blit(
             self.repayment_bar_label,
@@ -328,7 +329,7 @@ class CaughtHoldEffectState(State):
 
     def end(self):
         self.mgr.pop()
-        self.mgr.push(SnapshotViewState(self.mgr))
+        self.mgr.push(SnapshotViewState(self.mgr, because_caught=True))
 
 
 class SnapshotRestoreEffectState(State):
@@ -363,7 +364,7 @@ class SnapshotRestoreEffectState(State):
 
 
 class SnapshotViewState(State):
-    def __init__(self, mgr: StateManager):
+    def __init__(self, mgr: StateManager, because_caught=False):
         super().__init__(mgr)
         assert isinstance(self.mgr.stack[-1], CoreGameState)
         self.core = self.mgr.stack[-1]
@@ -380,7 +381,7 @@ class SnapshotViewState(State):
                     self.snapshot_times[-1] + self.core.snapshot_timer.duration
                 )
         self.snapshot_times.reverse()
-        if round(self.snapshot_times[-1], 1) == 0.0:
+        if self.snapshot_times and round(self.snapshot_times[-1], 1) == 0.0:
             self.snapshot_times.pop()
             self.snapshots.pop()
         self.selected = len(self.snapshots) - 1
@@ -389,16 +390,17 @@ class SnapshotViewState(State):
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
+        self.because_caught = because_caught
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+            if event.key == pygame.K_ESCAPE and not self.because_caught:
                 self.mgr.pop()
             elif event.key == pygame.K_LEFT:
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_RIGHT:
                 self.selected = min(len(self.snapshots) - 1, self.selected + 1)
-            elif event.key == pygame.K_RETURN:
+            elif event.key == pygame.K_RETURN and self.snapshots:
                 player_snap, guards_snap = self.snapshots[self.selected]
                 repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
                 self.core.player.load_snapshot(player_snap)
@@ -434,6 +436,14 @@ class SnapshotViewState(State):
         overlay = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, self.darkening))
         surface.blit(overlay)
+        if not self.snapshots: 
+            no_snaps_text = res.render_text(
+                "No snapshots yet! They’re taken every half a second, so please wait just a bit.", 16
+            )
+            surface.blit(
+                no_snaps_text, dest=(AREA_WIDTH // 2 - no_snaps_text.width // 2, 32)
+            )
+            return
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
         player_snap, guards_snap = self.snapshots[self.selected]
         player = Player(self.core.level)
@@ -445,9 +455,14 @@ class SnapshotViewState(State):
             guard.load_snapshot(guard_snap)
         render(snapshot_preview, self.core.level, player, guards)
         snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
-        powered_by_text = res.render_text(
-            "Travel back in time, powered by Time Value Inc.!", 16
-        )
+        if self.because_caught:
+            powered_by_text = res.render_text(
+                "Sucks. Luckily, you have Time Value Inc. ® on your side!", 16
+            )
+        else:
+            powered_by_text = res.render_text(
+                "Travel back in time, powered by Time Value Inc. ®!", 16
+            )
         surface.blit(
             powered_by_text, dest=(AREA_WIDTH // 2 - powered_by_text.width // 2, 32)
         )
@@ -461,8 +476,12 @@ class SnapshotViewState(State):
                 AREA_HEIGHT // 2 + snapshot_preview.height // 2,
             ),
         )
+        disclaimer = f"Repayment: Your movement speed will be halved for the next {time_ago * 1.25:.1f} seconds"
+        instr = "[ENTER] to confirm"
+        if not self.because_caught:
+            instr += "      [ESC] to cancel"
         disclaimer_text = res.render_text(
-            f"Repayment: Your movement speed will be halved for the next {time_ago * 1.25:.1f} seconds\n\n[ENTER] to confirm      [ESC] to cancel",
+            disclaimer + "\n\n" + instr,
             16,
         )
         surface.blit(
