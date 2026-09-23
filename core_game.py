@@ -284,6 +284,7 @@ class Guard:
         )
 
     def check_caught(self, player_pos: tuple[int, int]):
+        self.caught = False
         for pos in (
             player_pos,
             *adjacents_cardinal(*player_pos, by=self.radius // 2),
@@ -368,6 +369,10 @@ class CoreGameState(State):
         self.guard_timer.update(dt)
         for guard in self.guards:
             guard.check_caught((int(self.player.pos.x), int(self.player.pos.y)))
+            if guard.caught:
+                print(self.mgr.stack)
+                self.mgr.push(CaughtHoldEffectState(self.mgr))
+                return
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
         self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
@@ -406,10 +411,7 @@ class CoreGameState(State):
 
     def guard_step(self):
         for guard in self.guards:
-            guard.caught = False
-            guard.update((int(self.player.pos.x), int(self.player.pos.y)))
-            if guard.caught:
-                self.mgr.push(CaughtHoldEffectState(self.mgr))
+            guard.update()
 
     def end_debuff(self):
         self.debuff = False
