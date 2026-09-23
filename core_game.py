@@ -496,18 +496,15 @@ class SnapshotViewState(State):
         overlay = pygame.Surface((AREA_WIDTH, AREA_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, self.darkening))
         surface.blit(overlay)
-        snapshot_previews = []
-        for snapshot in self.core.state_snapshots:
-            preview_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-            player_snap, guards_snap = snapshot
-            player = Player(self.core.level)
-            player.load_snapshot(player_snap)
-            guards = [Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap]
-            for guard, guard_snap in zip(guards, guards_snap):
-                guard.load_snapshot(guard_snap)
-            render(preview_surf, self.core.level, player, guards)
-            preview_surf = pygame.transform.scale_by(preview_surf, 0.5)
-            snapshot_previews.append(preview_surf)
+        snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
+        player_snap, guards_snap = self.core.state_snapshots[self.selected]
+        player = Player(self.core.level)
+        player.load_snapshot(player_snap)
+        guards = [Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap]
+        for guard, guard_snap in zip(guards, guards_snap):
+            guard.load_snapshot(guard_snap)
+        render(snapshot_preview, self.core.level, player, guards)
+        snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
         powered_by_text = res.render_text(
             "Travel back in time, powered by Time Value Inc.!", 16
         )
@@ -515,7 +512,7 @@ class SnapshotViewState(State):
             powered_by_text, dest=(AREA_WIDTH // 2 - powered_by_text.width // 2, 32)
         )
         surface.blit(
-            snapshot_previews[self.selected], dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
+            snapshot_preview, dest=(AREA_WIDTH // 4, AREA_HEIGHT // 4)
         )
         time_ago = round(self.snapshot_times[self.selected], 1)
         snapshot_info_text = res.render_text(f"{time_ago:.1f}s ago", 32)
@@ -523,7 +520,7 @@ class SnapshotViewState(State):
             snapshot_info_text,
             dest=(
                 AREA_WIDTH // 2 - snapshot_info_text.width // 2,
-                AREA_HEIGHT // 2 + preview_surf.height // 2,
+                AREA_HEIGHT // 2 + snapshot_preview.height // 2,
             ),
         )
         disclaimer_text = res.render_text(
@@ -534,6 +531,6 @@ class SnapshotViewState(State):
             disclaimer_text,
             dest=(
                 AREA_WIDTH // 2 - disclaimer_text.width // 2,
-                AREA_HEIGHT // 2 + preview_surf.height // 2 + 48,
+                AREA_HEIGHT // 2 + snapshot_preview.height // 2 + 48,
             ),
         )
