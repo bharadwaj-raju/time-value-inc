@@ -259,12 +259,39 @@ class CoreGameState(State):
         self.ff_bar_label = res.render_text("SPEEDUP", 16)
         self.slowdown_bar_label = res.render_text("SLOWDOWN", 16)
 
+        self.slowdown = False
+        self.end_slowdown_timer = Timer(
+            duration=1.5, repeating=False, callback=self.end_slowdown
+        )
+
+        self.speedup = False
+        self.end_speedup_timer = Timer(
+            duration=1.5, repeating=False, callback=self.end_speedup
+        )
+
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
-            self.mgr.push(SnapshotViewState(self.mgr))
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_b:
+                self.mgr.push(SnapshotViewState(self.mgr))
+            elif event.key == pygame.K_s and not (
+                self.debuff or self.speedup or self.slowdown
+            ):
+                self.slowdown = True
+                self.end_slowdown_timer.start()
+            elif event.key == pygame.K_f and not (
+                self.debuff or self.speedup or self.slowdown
+            ):
+                self.speedup = True
+                self.end_speedup_timer.start()
 
     def update(self, dt):
-        self.guard_timer.update(dt)
+        player_dt = dt
+        if self.debuff:
+            player_dt /= 2
+        elif self.speedup:
+            player_dt *= 2
+        enemy_dt = (dt / 2) if self.slowdown else dt
+        self.guard_timer.update(enemy_dt)
         for guard in self.guards:
             guard.check_caught((int(self.player.pos.x), int(self.player.pos.y)))
             if guard.caught:
@@ -272,7 +299,9 @@ class CoreGameState(State):
                 return
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
-        self.player.update(dt / 2 if self.debuff else dt, self.level.walls)
+        self.end_slowdown_timer.update(dt)
+        self.end_speedup_timer.update(dt)
+        self.player.update(player_dt, self.level.walls)
 
     def draw_countdown(self, surface, y, label, fraction):
         surface.blit(
@@ -312,18 +341,18 @@ class CoreGameState(State):
             AREA_HEIGHT + 16 + 4 + 16,
             self.ff_bar_label,
             0.0
-            if not self.debuff or self.end_debuff_timer.duration == 0.0
-            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
+            if not self.speedup
+            else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
         )
         self.draw_countdown(
             surface,
             AREA_HEIGHT + 16 + 4 + 16 + 4 + 16,
             self.slowdown_bar_label,
             0.0
-            if not self.debuff or self.end_debuff_timer.duration == 0.0
-            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
+            if not self.slowdown
+            else self.end_slowdown_timer.time_left / self.end_slowdown_timer.duration,
         )
-        
+
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
         self.state_snapshots.append(snap)
@@ -334,6 +363,18 @@ class CoreGameState(State):
 
     def end_debuff(self):
         self.debuff = False
+
+    def end_slowdown(self):
+        self.slowdown = False
+        self.debuff = True
+        self.end_debuff_timer.duration = self.end_slowdown_timer.duration
+        self.end_debuff_timer.start()
+
+    def end_speedup(self):
+        self.speedup = False
+        self.debuff = True
+        self.end_debuff_timer.duration = self.end_speedup_timer.duration
+        self.end_debuff_timer.start()
 
 
 class CaughtHoldEffectState(State):
