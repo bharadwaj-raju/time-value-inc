@@ -25,6 +25,8 @@ WALL_COLOR = (140, 140, 160)
 BORDER_COLOR = (60, 60, 75)
 GUARD_VIS_COLOR = (255, 255, 0, 128)
 GUARD_VIS_ALERT_COLOR = (255, 100, 0, 128)
+SPEEDUP_COLOR = (106, 190, 48)
+REPAYMENT_COLOR = (251, 242, 54)
 
 
 class MovableEntity:
@@ -347,11 +349,11 @@ class CoreGameState(State):
         self.player.update(player_dt, self.level.walls)
         self.goal_anim.update(dt)
 
-    def draw_countdown(self, surface, x, y, fraction):
+    def draw_countdown(self, surface, x, y, fraction, color):
         pygame.draw.rect(surface, (255, 255, 255), (x, y, 100, 16), 2)
         pygame.draw.rect(
             surface,
-            (255, 255, 255),
+            color,
             (
                 x,
                 y,
@@ -394,6 +396,7 @@ class CoreGameState(State):
             0.0
             if not self.speedup
             else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
+            SPEEDUP_COLOR,
         )
         surface.blit(
             self.repayment_label,
@@ -409,6 +412,7 @@ class CoreGameState(State):
             0.0
             if not self.debuff or self.end_debuff_timer.duration == 0.0
             else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
+            REPAYMENT_COLOR,
         )
 
     def take_snapshot(self):
