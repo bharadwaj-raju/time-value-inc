@@ -2,7 +2,7 @@
   "tutorials": [
     {
       "file": "tut1.ppm",
-      "text": "See those lasers? They’re deadly to touch. And they go off a little too quickly to\neasily dodge…\n\nUse your SPEEDUP feature! It’ll slow the world down for 3 seconds,\nwhich should let you get past them.\nPay attention to when the REPAYMENT kicks in, though — you’ll be slowed down then.\n\nAnd don’t worry — if you get killed,\nthe BACK IN TIME feature will kick in automatically!"
+      "text": "See those lasers? They’re deadly to touch. And they go off a little too quickly to\neasily dodge…\n\nUse your SPEEDUP feature! It’ll slow down everything except you for 3 seconds,\nwhich should let you get past them.\n\nPay attention to when the REPAYMENT kicks in, though — you’ll be slowed down then.\n\nAnd don’t worry — if you get killed,\nthe BACK IN TIME feature will kick in automatically!"
     }
   ],
   "levels": ["1.ppm"]
