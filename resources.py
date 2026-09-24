@@ -26,6 +26,11 @@ class Resources:
     enemy_base: pygame.Surface
     enemy_spotted: pygame.Surface
 
+    wall_base: pygame.Surface
+    wall_laser_gun_base: pygame.Surface
+    wall_laser_gun_firing: pygame.Surface
+    laser_gun_fire: pygame.Surface
+
     goal_anim: Animation
 
     @classmethod
@@ -42,6 +47,11 @@ class Resources:
 
         cls.enemy_base = pygame.image.load(ROOT / "sprites" / "Sprite-Enemy-Base.png").convert_alpha()
         cls.enemy_spotted = pygame.image.load(ROOT / "sprites" / "Sprite-Enemy-Spotted.png").convert_alpha()
+
+        cls.wall_base = pygame.image.load(ROOT / "sprites/Sprite-Wall.png").convert_alpha()
+        cls.wall_laser_gun_base = pygame.image.load(ROOT / "sprites/Sprite-Laser-Gun.png").convert_alpha()
+        cls.wall_laser_gun_firing = pygame.image.load(ROOT / "sprites/Sprite-Laser-Gun-Firing.png").convert_alpha()
+        cls.laser_gun_fire = pygame.image.load(ROOT / "sprites/Sprite-Laser-Fire.png").convert_alpha()
 
         cls.goal_anim = Animation(ROOT / "sprites" / "Sprite-Goal-Glow.png")
 

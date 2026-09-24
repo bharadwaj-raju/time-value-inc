@@ -16,6 +16,8 @@ class LevelMap:
     TILEMAP_PLAYER = (255, 0, 0)
     TILEMAP_GOAL = (255, 255, 0)
     TILEMAP_GUARD = (0, 0, 255)
+    TILEMAP_LASER_GUN_DOWN = (255, 0, 255)
+    TILEMAP_LASER_DANGER = (128, 0, 128)
 
     def __init__(self, im: Image.Image):
         self.im = im
@@ -30,12 +32,14 @@ class LevelMap:
         self.walls = []
         self.player_start = (0, 0)
         self.goal = None
+        self.laser_guns = []
+        self.laser_guns_danger = []
         guard_tiles = set()
         wall_tiles = set()
         for y in range(self.im.height):
             for x in range(self.im.width):
                 p = self.im.getpixel((x, y))
-                if p == LevelMap.TILEMAP_WALL:
+                if p == LevelMap.TILEMAP_WALL or p == LevelMap.TILEMAP_LASER_GUN_DOWN:
                     wall_tiles.add((x, y))
                     self.walls.append(
                         pygame.Rect(
@@ -45,11 +49,16 @@ class LevelMap:
                             self.scale_factor,
                         )
                     )
-                elif p == LevelMap.TILEMAP_PLAYER:
+                if p == LevelMap.TILEMAP_LASER_DANGER:
+                    self.laser_guns_danger.append((x * self.scale_factor, y * self.scale_factor))
+                if p == LevelMap.TILEMAP_LASER_GUN_DOWN:
+                    wall_tiles.add((x, y))
+                    self.laser_guns.append((x * self.scale_factor, y * self.scale_factor))
+                if p == LevelMap.TILEMAP_PLAYER:
                     self.player_start = (x * self.scale_factor, y * self.scale_factor)
-                elif p == LevelMap.TILEMAP_GUARD:
+                if p == LevelMap.TILEMAP_GUARD:
                     guard_tiles.add((x, y))
-                elif p == LevelMap.TILEMAP_GOAL:
+                if p == LevelMap.TILEMAP_GOAL:
                     self.goal = (x, y)
 
         self.wall_edges = []

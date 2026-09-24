@@ -93,7 +93,7 @@ class MovableEntity:
 
 class Player(MovableEntity):
     def __init__(self, level: LevelMap):
-        super().__init__(*level.player_start, radius=level.scale_factor // 2)
+        super().__init__(*level.player_start, radius=16)
         self.level = level
 
     def snapshot(self):
@@ -214,8 +214,14 @@ LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
 
 def render(
-    surface, level: LevelMap, player: Player, guards: list[Guard], goal_anim: AnimationPlayer, draw_player=True,
-    player_just_restored=False
+    surface,
+    level: LevelMap,
+    player: Player,
+    guards: list[Guard],
+    goal_anim: AnimationPlayer,
+    draw_player=True,
+    firing_lasers=False,
+    player_just_restored=False,
 ):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
@@ -236,10 +242,20 @@ def render(
 
         surface.blit(fog_surf, (0, 0))
     for wall in level.walls:
-        pygame.draw.rect(surface, WALL_COLOR, wall, border_radius=4)
-        pygame.draw.rect(surface, BORDER_COLOR, wall, width=2, border_radius=4)
+        surface.blit(res.wall_base, wall)
+    for gun in level.laser_guns:
+        surface.blit(
+            res.wall_laser_gun_firing if firing_lasers else res.wall_laser_gun_base, gun
+        )
+    if firing_lasers:
+        for laser_danger in level.laser_guns_danger:
+            surface.blit(res.laser_gun_fire, laser_danger)
+
     assert level.goal
-    goal_anim.draw(surface, (level.goal[0] * level.scale_factor, level.goal[1] * level.scale_factor))
+    goal_anim.draw(
+        surface,
+        (level.goal[0] * level.scale_factor, level.goal[1] * level.scale_factor),
+    )
 
 
 def mm_ss(t: float) -> str:
@@ -279,10 +295,18 @@ class CoreGameState(State):
 
         self.speedup = False
         self.end_speedup_timer = Timer(
-            duration=2.0, repeating=False, callback=self.end_speedup
+            duration=3.0, repeating=False, callback=self.end_speedup
         )
 
-        self.goal_anim = AnimationPlayer(res.goal_anim, playstyle=AnimationPlayStyle.PINGPONG)
+        self.goal_anim = AnimationPlayer(
+            res.goal_anim, playstyle=AnimationPlayStyle.PINGPONG
+        )
+
+        self.firing_lasers = False
+        self.fire_lasers_timer = Timer(
+            duration=0.25, repeating=True, callback=self.fire_lasers
+        )
+        self.fire_lasers_timer.start()
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -302,6 +326,20 @@ class CoreGameState(State):
             if guard.caught:
                 self.mgr.push(CaughtHoldEffectState(self.mgr))
                 return
+        self.fire_lasers_timer.update(enemy_dt)
+        if self.firing_lasers:
+            for laser_danger in self.level.laser_guns_danger:
+                lx, ly = laser_danger
+                lw, lh = self.level.scale_factor, self.level.scale_factor
+                lx += self.level.scale_factor // 4
+                lw -= self.level.scale_factor // 2
+                for pos in (
+                    self.player.pos,
+                    *adjacents(*self.player.pos, by=16),
+                ):
+                    if pygame.Rect(lx, ly, lw, lh).collidepoint(*pos):
+                        self.mgr.push(CaughtHoldEffectState(self.mgr))
+                        return
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
         self.end_speedup_timer.update(dt)
@@ -324,16 +362,29 @@ class CoreGameState(State):
     def draw(self, surface):
         if any(guard.caught for guard in self.guards):
             return
-        render(surface, self.level, self.player, self.guards, self.goal_anim)
-        surface.blit(res.render_text(mm_ss(self.t), 32), dest=(32, AREA_HEIGHT + 16 + 8))
-        btns_offset_x = 128 + 32
-        res.backintime_icon.draw(surface, dest=(btns_offset_x + 32, AREA_HEIGHT + 16), scale=3)
+        render(
+            surface,
+            self.level,
+            self.player,
+            self.guards,
+            self.goal_anim,
+            firing_lasers=self.firing_lasers,
+        )
         surface.blit(
-            self.backinttime_key_label, dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            res.render_text(mm_ss(self.t), 32), dest=(32, AREA_HEIGHT + 16 + 8)
+        )
+        btns_offset_x = 128 + 32
+        res.backintime_icon.draw(
+            surface, dest=(btns_offset_x + 32, AREA_HEIGHT + 16), scale=3
+        )
+        surface.blit(
+            self.backinttime_key_label,
+            dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
         res.ff_icon.draw(surface, dest=(btns_offset_x + 256, AREA_HEIGHT + 16), scale=3)
         surface.blit(
-            self.speedup_key_label, dest=(btns_offset_x + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            self.speedup_key_label,
+            dest=(btns_offset_x + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
         self.draw_countdown(
             surface,
@@ -358,7 +409,6 @@ class CoreGameState(State):
             if not self.debuff or self.end_debuff_timer.duration == 0.0
             else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
         )
-        
 
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
@@ -379,6 +429,10 @@ class CoreGameState(State):
         self.end_debuff_timer.duration += self.end_speedup_timer.duration
         self.end_debuff_timer.active = True
 
+    def fire_lasers(self):
+        self.firing_lasers = not self.firing_lasers
+        self.fire_lasers_timer.start()
+
 
 class CaughtHoldEffectState(State):
     def __init__(self, mgr: StateManager):
@@ -392,7 +446,15 @@ class CaughtHoldEffectState(State):
         self.end_effect_timer.update(dt)
 
     def draw(self, surface):
-        render(surface, self.core.level, self.core.player, self.core.guards, self.core.goal_anim)
+        render(
+            surface,
+            self.core.level,
+            self.core.player,
+            self.core.guards,
+            self.core.goal_anim,
+            firing_lasers=self.core.firing_lasers,
+            player_just_restored=True
+        )
 
     def end(self):
         self.mgr.pop()
@@ -422,7 +484,7 @@ class SnapshotRestoreEffectState(State):
             self.core.guards,
             self.core.goal_anim,
             draw_player=self.draw_player,
-            player_just_restored=True
+            player_just_restored=True,
         )
 
     def blink(self):
@@ -442,7 +504,13 @@ class SnapshotViewState(State):
             self.snapshots.pop()
         self.selected = len(self.snapshots) - 1
         self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        render(self.current_surf, self.core.level, self.core.player, self.core.guards, self.core.goal_anim)
+        render(
+            self.current_surf,
+            self.core.level,
+            self.core.player,
+            self.core.guards,
+            self.core.goal_anim,
+        )
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
@@ -472,7 +540,10 @@ class SnapshotViewState(State):
                 self.core.debuff = True
                 self.core.end_debuff_timer.active = True
                 self.core.t = snap_t
-                while self.core.state_snapshots and self.core.state_snapshots[-1][0] >= snap_t:
+                while (
+                    self.core.state_snapshots
+                    and self.core.state_snapshots[-1][0] >= snap_t
+                ):
                     self.core.state_snapshots.pop()
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
