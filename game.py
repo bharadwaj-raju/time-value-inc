@@ -1,17 +1,16 @@
-from title_screen import TitleScreenState
 import sys
 
 import pygame
 
 from consts import AREA_HEIGHT, AREA_WIDTH, STATUSBAR_HEIGHT
-from core_game import CoreGameState
 from resources import res
 from state import StateManager
+from title_screen import TitleScreenState
 
 pygame.init()
-res.load()
 
 screen = pygame.display.set_mode((AREA_WIDTH, AREA_HEIGHT + STATUSBAR_HEIGHT))
+res.load()
 pygame.display.set_caption("Time Value Inc.")
 clock = pygame.time.Clock()
 
