@@ -213,7 +213,8 @@ LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
 
 def render(
-    surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True
+    surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True,
+    player_just_restored=False
 ):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
@@ -223,7 +224,7 @@ def render(
         if guard.caught:
             caught = True
     if draw_player:
-        player.draw(surface, caught=caught)
+        player.draw(surface, caught=caught or player_just_restored)
     if len(player_vis_poly) >= 3:
         fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
         fog_surf.fill((10, 10, 15))
@@ -387,7 +388,7 @@ class SnapshotRestoreEffectState(State):
         self.core = self.mgr.stack[-1]
         self.draw_player = True
         self.blink_timer = Timer(0.1, repeating=True, callback=self.blink)
-        self.end_effect_timer = Timer(0.5, repeating=False, callback=self.end)
+        self.end_effect_timer = Timer(0.75, repeating=False, callback=self.end)
         self.blink_timer.start()
         self.end_effect_timer.start()
 
@@ -402,6 +403,7 @@ class SnapshotRestoreEffectState(State):
             self.core.player,
             self.core.guards,
             draw_player=self.draw_player,
+            player_just_restored=True
         )
 
     def blink(self):
