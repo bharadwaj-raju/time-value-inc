@@ -40,6 +40,12 @@ class Timer:
         self.time_left = duration
         self.active = False
 
+    def snapshot(self) -> tuple:
+        return (self.active, self.repeating, self.time_left, self.duration)
+
+    def load_snapshot(self, snap: tuple):
+        (self.active, self.repeating, self.time_left, self.duration) = snap
+        
     def start(self):
         self.time_left = self.duration
         self.active = True

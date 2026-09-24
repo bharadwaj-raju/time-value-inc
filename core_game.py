@@ -1,3 +1,4 @@
+import copy
 import math
 from collections import deque
 
@@ -411,8 +412,31 @@ class CoreGameState(State):
         )
 
     def take_snapshot(self):
-        snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
+        snap = (
+            self.player.snapshot(),
+            [g.snapshot() for g in self.guards],
+            self.firing_lasers,
+            self.fire_lasers_timer.snapshot(),
+            self.guard_timer.snapshot(),
+        )
         self.state_snapshots.append((self.t, snap))
+
+    def load_snapshot(self, snap, penalty=0.0):
+        t, (player_snap, guard_snaps, firing_lasers, fire_lasers_timer, guard_step_timer) = snap
+        self.player.load_snapshot(player_snap)
+        for guard, guard_snap in zip(self.guards, guard_snaps):
+            guard.load_snapshot(guard_snap)
+        self.firing_lasers = firing_lasers
+        self.fire_lasers_timer.load_snapshot(fire_lasers_timer)
+        self.guard_timer.load_snapshot(guard_step_timer)
+        self.t = t
+        self.debuff = True
+        self.end_debuff_timer.time_left += penalty
+        self.end_debuff_timer.duration += penalty
+        self.end_debuff_timer.active = True
+        state_snapshots_new = [snap for snap in self.state_snapshots if snap[0] <= t]
+        self.state_snapshots.clear()
+        self.state_snapshots.extend(state_snapshots_new)
 
     def guard_step(self):
         for guard in self.guards:
@@ -453,7 +477,7 @@ class CaughtHoldEffectState(State):
             self.core.guards,
             self.core.goal_anim,
             firing_lasers=self.core.firing_lasers,
-            player_just_restored=True
+            player_just_restored=True,
         )
 
     def end(self):
@@ -510,6 +534,7 @@ class SnapshotViewState(State):
             self.core.player,
             self.core.guards,
             self.core.goal_anim,
+            firing_lasers=self.core.firing_lasers,
         )
         self.blur_radius = 0
         self.darkening = 0
@@ -527,24 +552,10 @@ class SnapshotViewState(State):
             elif event.key == pygame.K_RIGHT:
                 self.selected = min(len(self.snapshots) - 1, self.selected + 1)
             elif event.key == pygame.K_RETURN and self.snapshots:
-                snap_t, (player_snap, guards_snap) = self.snapshots[self.selected]
+                snap_t, (snap) = self.snapshots[self.selected]
                 ago = self.core.t - snap_t
                 repayment = round(round(ago, 1) * 1.5, 1)
-                self.core.player.load_snapshot(player_snap)
-                self.core.player.vel = pygame.Vector2(0.0, 0.0)
-                for guard, guard_snap in zip(self.core.guards, guards_snap):
-                    guard.load_snapshot(guard_snap)
-                self.core.end_debuff_timer.time_left += repayment
-                self.core.end_debuff_timer.duration += repayment
-                self.core.end_debuff_timer.active = True
-                self.core.debuff = True
-                self.core.end_debuff_timer.active = True
-                self.core.t = snap_t
-                while (
-                    self.core.state_snapshots
-                    and self.core.state_snapshots[-1][0] >= snap_t
-                ):
-                    self.core.state_snapshots.pop()
+                self.core.load_snapshot((snap_t, snap), penalty=repayment)
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
 
@@ -577,15 +588,15 @@ class SnapshotViewState(State):
             )
             return
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        snap_t, (player_snap, guards_snap) = self.snapshots[self.selected]
+        snap_t, (player_snap, guards_snap, firing_lasers, *_) = self.snapshots[self.selected]
         player = Player(self.core.level)
         player.load_snapshot(player_snap)
         guards = [
-            Guard(self.core.guards[0].route, self.core.level) for _ in guards_snap
+            Guard(self.core.guards[i].route, self.core.level) for i in enumerate(guards_snap)
         ]
         for guard, guard_snap in zip(guards, guards_snap):
             guard.load_snapshot(guard_snap)
-        render(snapshot_preview, self.core.level, player, guards, self.core.goal_anim)
+        render(snapshot_preview, self.core.level, player, guards, self.core.goal_anim, firing_lasers=firing_lasers)
         snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
         if self.because_caught:
             powered_by_text = res.render_text(
