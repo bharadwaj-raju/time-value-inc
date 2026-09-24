@@ -242,6 +242,11 @@ def render(
     goal_anim.draw(surface, (level.goal[0] * level.scale_factor, level.goal[1] * level.scale_factor))
 
 
+def mm_ss(t: float) -> str:
+    mins, rsecs = divmod(t, 60)
+    return f"{int(mins):02d}:{rsecs:04.1f}"
+
+
 class CoreGameState(State):
     def __init__(self, mgr: StateManager):
         super().__init__(mgr)
@@ -320,16 +325,23 @@ class CoreGameState(State):
         if any(guard.caught for guard in self.guards):
             return
         render(surface, self.level, self.player, self.guards, self.goal_anim)
-        minutes, seconds = divmod(int(self.t), 60)
-        mm_ss = f"{minutes:02}:{seconds:02}"
-        surface.blit(res.render_text(mm_ss, 32), dest=(32, AREA_HEIGHT + 16 + 8))
-        res.backintime_icon.draw(surface, dest=(128 + 32, AREA_HEIGHT + 16), scale=3)
+        surface.blit(res.render_text(mm_ss(self.t), 32), dest=(32, AREA_HEIGHT + 16 + 8))
+        btns_offset_x = 128 + 32
+        res.backintime_icon.draw(surface, dest=(btns_offset_x + 32, AREA_HEIGHT + 16), scale=3)
         surface.blit(
-            self.backinttime_key_label, dest=(128 + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            self.backinttime_key_label, dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
         )
-        res.ff_icon.draw(surface, dest=(128 + 256, AREA_HEIGHT + 16), scale=3)
+        res.ff_icon.draw(surface, dest=(btns_offset_x + 256, AREA_HEIGHT + 16), scale=3)
         surface.blit(
-            self.speedup_key_label, dest=(128 + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            self.speedup_key_label, dest=(btns_offset_x + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+        )
+        self.draw_countdown(
+            surface,
+            btns_offset_x + 256 + 8,
+            AREA_HEIGHT + 32 + 8 + 32,
+            0.0
+            if not self.speedup
+            else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
         )
         surface.blit(
             self.repayment_label,
@@ -346,14 +358,7 @@ class CoreGameState(State):
             if not self.debuff or self.end_debuff_timer.duration == 0.0
             else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
         )
-        self.draw_countdown(
-            surface,
-            128 + 256 + 8,
-            AREA_HEIGHT + 32 + 8 + 32,
-            0.0
-            if not self.speedup
-            else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
-        )
+        
 
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
@@ -540,9 +545,7 @@ class SnapshotViewState(State):
                 ),
             )
         time_ago = round(self.core.t - snap_t, 1)
-        minutes, seconds = divmod(int(snap_t), 60)
-        mm_ss = f"{minutes:02}:{seconds:02}"
-        snapshot_info_text = res.render_text(f"{mm_ss}", 32)
+        snapshot_info_text = res.render_text(mm_ss(snap_t), 32)
         surface.blit(
             snapshot_info_text,
             dest=(
