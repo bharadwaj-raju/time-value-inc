@@ -247,6 +247,8 @@ class CoreGameState(State):
         super().__init__(mgr)
         self.level = LEVEL_MAPS[0]
 
+        self.t = 0
+
         self.player = Player(self.level)
         self.guards = [Guard(route, self.level) for route in self.level.guard_routes]
 
@@ -286,6 +288,7 @@ class CoreGameState(State):
                 self.end_speedup_timer.start()
 
     def update(self, dt):
+        self.t += dt
         player_dt = (dt / 2) if self.debuff else dt
         enemy_dt = (dt / 2) if self.speedup else dt
         self.guard_timer.update(enemy_dt)
@@ -317,13 +320,16 @@ class CoreGameState(State):
         if any(guard.caught for guard in self.guards):
             return
         render(surface, self.level, self.player, self.guards, self.goal_anim)
-        res.backintime_icon.draw(surface, dest=(32, AREA_HEIGHT + 16), scale=3)
+        minutes, seconds = divmod(int(self.t), 60)
+        mm_ss = f"{minutes:02}:{seconds:02}"
+        surface.blit(res.render_text(mm_ss, 32), dest=(32, AREA_HEIGHT + 16 + 8))
+        res.backintime_icon.draw(surface, dest=(128 + 32, AREA_HEIGHT + 16), scale=3)
         surface.blit(
-            self.backinttime_key_label, dest=(32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            self.backinttime_key_label, dest=(128 + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
         )
-        res.ff_icon.draw(surface, dest=(256, AREA_HEIGHT + 16), scale=3)
+        res.ff_icon.draw(surface, dest=(128 + 256, AREA_HEIGHT + 16), scale=3)
         surface.blit(
-            self.speedup_key_label, dest=(256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
+            self.speedup_key_label, dest=(128 + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
         )
         surface.blit(
             self.repayment_label,
@@ -342,7 +348,7 @@ class CoreGameState(State):
         )
         self.draw_countdown(
             surface,
-            256 + 8,
+            128 + 256 + 8,
             AREA_HEIGHT + 32 + 8 + 32,
             0.0
             if not self.speedup
@@ -351,7 +357,7 @@ class CoreGameState(State):
 
     def take_snapshot(self):
         snap = (self.player.snapshot(), [g.snapshot() for g in self.guards])
-        self.state_snapshots.append(snap)
+        self.state_snapshots.append((self.t, snap))
 
     def guard_step(self):
         for guard in self.guards:
@@ -364,8 +370,9 @@ class CoreGameState(State):
     def end_speedup(self):
         self.speedup = False
         self.debuff = True
+        self.end_debuff_timer.time_left += self.end_speedup_timer.duration
         self.end_debuff_timer.duration += self.end_speedup_timer.duration
-        self.end_debuff_timer.start()
+        self.end_debuff_timer.active = True
 
 
 class CaughtHoldEffectState(State):
@@ -426,20 +433,7 @@ class SnapshotViewState(State):
         assert isinstance(self.mgr.stack[-1], CoreGameState)
         self.core = self.mgr.stack[-1]
         self.snapshots = self.core.state_snapshots
-        self.snapshot_times = []
-        for i in range(len(self.snapshots))[::-1]:
-            if i == len(self.snapshots) - 1:
-                self.snapshot_times.append(
-                    self.core.snapshot_timer.duration
-                    - self.core.snapshot_timer.time_left
-                )
-            else:
-                self.snapshot_times.append(
-                    self.snapshot_times[-1] + self.core.snapshot_timer.duration
-                )
-        self.snapshot_times.reverse()
-        if self.snapshot_times and round(self.snapshot_times[-1], 1) == 0.0:
-            self.snapshot_times.pop()
+        if self.snapshots and round(self.core.t - self.snapshots[-1][0], 1) == 0.0:
             self.snapshots.pop()
         self.selected = len(self.snapshots) - 1
         self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
@@ -460,19 +454,21 @@ class SnapshotViewState(State):
             elif event.key == pygame.K_RIGHT:
                 self.selected = min(len(self.snapshots) - 1, self.selected + 1)
             elif event.key == pygame.K_RETURN and self.snapshots:
-                player_snap, guards_snap = self.snapshots[self.selected]
-                repayment = round(round(self.snapshot_times[self.selected], 1) * 1.5, 1)
+                snap_t, (player_snap, guards_snap) = self.snapshots[self.selected]
+                ago = self.core.t - snap_t
+                repayment = round(round(ago, 1) * 1.5, 1)
                 self.core.player.load_snapshot(player_snap)
                 self.core.player.vel = pygame.Vector2(0.0, 0.0)
                 for guard, guard_snap in zip(self.core.guards, guards_snap):
                     guard.load_snapshot(guard_snap)
-                if self.core.debuff:
-                    # debts stack
-                    self.core.end_debuff_timer.duration += repayment
-                else:
-                    self.core.debuff = True
-                    self.core.end_debuff_timer.duration = repayment
-                    self.core.end_debuff_timer.start()
+                self.core.end_debuff_timer.time_left += repayment
+                self.core.end_debuff_timer.duration += repayment
+                self.core.end_debuff_timer.active = True
+                self.core.debuff = True
+                self.core.end_debuff_timer.active = True
+                self.core.t = snap_t
+                while self.core.state_snapshots and self.core.state_snapshots[-1][0] >= snap_t:
+                    self.core.state_snapshots.pop()
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
 
@@ -505,7 +501,7 @@ class SnapshotViewState(State):
             )
             return
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        player_snap, guards_snap = self.snapshots[self.selected]
+        snap_t, (player_snap, guards_snap) = self.snapshots[self.selected]
         player = Player(self.core.level)
         player.load_snapshot(player_snap)
         guards = [
@@ -543,8 +539,10 @@ class SnapshotViewState(State):
                     AREA_HEIGHT // 2 - self.left_arrow.height // 2,
                 ),
             )
-        time_ago = round(self.snapshot_times[self.selected], 1)
-        snapshot_info_text = res.render_text(f"{time_ago:.1f}s ago", 32)
+        time_ago = round(self.core.t - snap_t, 1)
+        minutes, seconds = divmod(int(snap_t), 60)
+        mm_ss = f"{minutes:02}:{seconds:02}"
+        snapshot_info_text = res.render_text(f"{mm_ss}", 32)
         surface.blit(
             snapshot_info_text,
             dest=(
