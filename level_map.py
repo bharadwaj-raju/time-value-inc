@@ -18,9 +18,11 @@ class LevelMap:
     TILEMAP_GUARD = (0, 0, 255)
     TILEMAP_LASER_GUN_DOWN = (255, 0, 255)
     TILEMAP_LASER_DANGER = (128, 0, 128)
+    TILEMAP_TUTORIAL_TEXT_MARKER = (128, 128, 128)
 
-    def __init__(self, im: Image.Image):
+    def __init__(self, im: Image.Image, tutorial_text: str | None = None):
         self.im = im
+        self.tutorial_text = tutorial_text
         self.scale_factor = AREA_WIDTH // im.width
         self.process()
 
@@ -34,6 +36,8 @@ class LevelMap:
         self.goal = None
         self.laser_guns = []
         self.laser_guns_danger = []
+        self.tutorial_text_marker = None
+        self.tutorial_text_tiles = []
         guard_tiles = set()
         wall_tiles = set()
         for y in range(self.im.height):
@@ -49,6 +53,10 @@ class LevelMap:
                             self.scale_factor,
                         )
                     )
+                if p == LevelMap.TILEMAP_TUTORIAL_TEXT_MARKER:
+                    if not self.tutorial_text_marker:
+                        self.tutorial_text_marker = ((x * self.scale_factor, y * self.scale_factor))
+                    self.tutorial_text_tiles.append((x * self.scale_factor, y * self.scale_factor))
                 if p == LevelMap.TILEMAP_LASER_DANGER:
                     self.laser_guns_danger.append((x * self.scale_factor, y * self.scale_factor))
                 if p == LevelMap.TILEMAP_LASER_GUN_DOWN:

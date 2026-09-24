@@ -6,7 +6,7 @@ import pygame
 import pygame.gfxdraw
 
 from animation import AnimationPlayer, AnimationPlayStyle
-from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, LEVELS_DIR
+from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR
 from geometry import (
     adjacents,
     adjacents_cardinal,
@@ -213,9 +213,6 @@ class Guard:
         )
 
 
-LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
-
-
 def render(
     surface,
     level: LevelMap,
@@ -253,6 +250,11 @@ def render(
     if firing_lasers:
         for laser_danger in level.laser_guns_danger:
             surface.blit(res.laser_gun_fire, laser_danger)
+    if level.tutorial_text_marker:
+        for tile in level.tutorial_text_tiles:
+            pygame.draw.rect(surface, BG_COLOR, (*tile, level.scale_factor, level.scale_factor))
+        dest = (level.tutorial_text_marker[0] + 16, level.tutorial_text_marker[1] + 16)
+        surface.blit(res.render_text(level.tutorial_text, 16), dest=dest)
 
     assert level.goal
     goal_anim.draw(
@@ -269,7 +271,7 @@ def mm_ss(t: float) -> str:
 class CoreGameState(State):
     def __init__(self, mgr: StateManager):
         super().__init__(mgr)
-        self.level = LEVEL_MAPS[0]
+        self.level = res.tutorials[0]
 
         self.t = 0
 
