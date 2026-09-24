@@ -1,5 +1,6 @@
 import pygame
 
+from animation import Animation
 from consts import ROOT
 from icon import Icon
 
@@ -25,6 +26,8 @@ class Resources:
     enemy_base: pygame.Surface
     enemy_spotted: pygame.Surface
 
+    goal_anim: Animation
+
     @classmethod
     def load(cls):
         cls.font128 = pygame.font.Font(FONT_FILE, 128)
@@ -39,6 +42,8 @@ class Resources:
 
         cls.enemy_base = pygame.image.load(ROOT / "sprites" / "Sprite-Enemy-Base.png").convert_alpha()
         cls.enemy_spotted = pygame.image.load(ROOT / "sprites" / "Sprite-Enemy-Spotted.png").convert_alpha()
+
+        cls.goal_anim = Animation(ROOT / "sprites" / "Sprite-Goal-Glow.png")
 
     @classmethod
     def render_text(cls, text, size) -> pygame.Surface:

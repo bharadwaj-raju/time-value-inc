@@ -4,6 +4,7 @@ from collections import deque
 import pygame
 import pygame.gfxdraw
 
+from animation import AnimationPlayer, AnimationPlayStyle
 from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, LEVELS_DIR
 from geometry import (
     adjacents,
@@ -213,7 +214,7 @@ LEVEL_MAPS = [LevelMap.from_file(f) for f in LEVELS_DIR.iterdir()]
 
 
 def render(
-    surface, level: LevelMap, player: Player, guards: list[Guard], draw_player=True,
+    surface, level: LevelMap, player: Player, guards: list[Guard], goal_anim: AnimationPlayer, draw_player=True,
     player_just_restored=False
 ):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
@@ -237,6 +238,8 @@ def render(
     for wall in level.walls:
         pygame.draw.rect(surface, WALL_COLOR, wall, border_radius=4)
         pygame.draw.rect(surface, BORDER_COLOR, wall, width=2, border_radius=4)
+    assert level.goal
+    goal_anim.draw(surface, (level.goal[0] * level.scale_factor, level.goal[1] * level.scale_factor))
 
 
 class CoreGameState(State):
@@ -272,6 +275,8 @@ class CoreGameState(State):
             duration=2.0, repeating=False, callback=self.end_speedup
         )
 
+        self.goal_anim = AnimationPlayer(res.goal_anim, playstyle=AnimationPlayStyle.PINGPONG)
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_b:
@@ -293,6 +298,7 @@ class CoreGameState(State):
         self.end_debuff_timer.update(dt)
         self.end_speedup_timer.update(dt)
         self.player.update(player_dt, self.level.walls)
+        self.goal_anim.update(dt)
 
     def draw_countdown(self, surface, x, y, fraction):
         pygame.draw.rect(surface, (255, 255, 255), (x, y, 100, 16), 2)
@@ -310,7 +316,7 @@ class CoreGameState(State):
     def draw(self, surface):
         if any(guard.caught for guard in self.guards):
             return
-        render(surface, self.level, self.player, self.guards)
+        render(surface, self.level, self.player, self.guards, self.goal_anim)
         res.backintime_icon.draw(surface, dest=(32, AREA_HEIGHT + 16), scale=3)
         surface.blit(
             self.backinttime_key_label, dest=(32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8)
@@ -374,7 +380,7 @@ class CaughtHoldEffectState(State):
         self.end_effect_timer.update(dt)
 
     def draw(self, surface):
-        render(surface, self.core.level, self.core.player, self.core.guards)
+        render(surface, self.core.level, self.core.player, self.core.guards, self.core.goal_anim)
 
     def end(self):
         self.mgr.pop()
@@ -402,6 +408,7 @@ class SnapshotRestoreEffectState(State):
             self.core.level,
             self.core.player,
             self.core.guards,
+            self.core.goal_anim,
             draw_player=self.draw_player,
             player_just_restored=True
         )
@@ -436,7 +443,7 @@ class SnapshotViewState(State):
             self.snapshots.pop()
         self.selected = len(self.snapshots) - 1
         self.current_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        render(self.current_surf, self.core.level, self.core.player, self.core.guards)
+        render(self.current_surf, self.core.level, self.core.player, self.core.guards, self.core.goal_anim)
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
@@ -506,7 +513,7 @@ class SnapshotViewState(State):
         ]
         for guard, guard_snap in zip(guards, guards_snap):
             guard.load_snapshot(guard_snap)
-        render(snapshot_preview, self.core.level, player, guards)
+        render(snapshot_preview, self.core.level, player, guards, self.core.goal_anim)
         snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
         if self.because_caught:
             powered_by_text = res.render_text(

@@ -49,6 +49,8 @@ class LevelMap:
                     self.player_start = (x * self.scale_factor, y * self.scale_factor)
                 elif p == LevelMap.TILEMAP_GUARD:
                     guard_tiles.add((x, y))
+                elif p == LevelMap.TILEMAP_GOAL:
+                    self.goal = (x, y)
 
         self.wall_edges = []
 
