@@ -1,3 +1,4 @@
+from interstitials import LevelDoneState
 from core_game import CoreGameState
 from intro_screed import IntroScreed
 from resources import res
@@ -40,6 +41,8 @@ class LevelManager(State):
         elif stage.startswith("level-"):
             nlvl = int(stage.removeprefix("level-"))
             self.mgr.push(CoreGameState(self.mgr, res.levels[nlvl]))
+        elif stage == "finished":
+            self.mgr.push(LevelDoneState(self.mgr, extra_message="That’s it! We accomplished our mission!"))
 
     def update(self, dt):
         if self.mgr.stack[-1] is not self:
@@ -47,6 +50,8 @@ class LevelManager(State):
         res.save.last_stage = self.stage
         res.save.save()
         print("Saved")
+        if self.stage.startswith(("level-", "tutorial-")):
+            self.mgr.push(LevelDoneState(self.mgr, extra_message="There’s more, though…"))
         self.stage = get_next_stage(self.stage)
         print(f"Next stage: {self.stage}")
         self.start_stage(self.stage)
