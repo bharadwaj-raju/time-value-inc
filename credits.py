@@ -28,7 +28,6 @@ class Credits(State):
     def draw(self, surface):
         surface.fill(BG_COLOR)
         surface.blit(self.text, dest=(16, 16))
-        total_sprites_width = self.player_sprite.width + self.guard_sprite.width
         player_width = self.player_sprite.width 
         guard_width = self.guard_sprite.width
         gap = 64
