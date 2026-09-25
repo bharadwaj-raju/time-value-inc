@@ -38,6 +38,10 @@ class IntroScreed(State):
             ),
             ("Anyway, let’s get you into training! Off you go!", res.player_shock),
         )
+        self.continue_prompt_text = res.render_text(
+            "Press [ENTER] to continue", 16
+        )
+
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -54,6 +58,6 @@ class IntroScreed(State):
         sprite = pygame.transform.scale(self.lines[self.line][1], (128, 128))
         surface.blit(sprite, dest=(SCREEN_WIDTH // 2 - sprite.width // 2, 256 + 128 + 64))
         surface.blit(
-            res.render_text("Press any key to continue", 16),
-            dest=(16, SCREEN_HEIGHT - 32),
+            self.continue_prompt_text,
+            dest=(SCREEN_WIDTH // 2 - self.continue_prompt_text.width // 2, SCREEN_HEIGHT - 32),
         )

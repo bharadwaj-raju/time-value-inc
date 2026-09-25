@@ -34,6 +34,8 @@ class WantResetState(State):
             if event.key == pygame.K_RETURN:
                 res.save.last_stage = "title-screen"
                 res.save.save()
+                self.mgr.pop()
+                self.mgr.pop()
             elif event.key == pygame.K_ESCAPE:
                 self.mgr.pop()  # self
                 self.mgr.pop()  # level manager

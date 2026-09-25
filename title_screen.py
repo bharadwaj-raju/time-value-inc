@@ -1,3 +1,4 @@
+from credits import Credits
 import random
 
 import pygame
@@ -21,6 +22,7 @@ class TitleScreenState(State):
         self.tagline_surf = res.render_text("“Never heard of us? We can fix that!”", 16)
         self.enter_surf = res.render_text("Press [ENTER] to start", 32)
         self.quit_surf = res.render_text("[Q]uit", 16)
+        self.credits_surf = res.render_text("[C]redits", 16)
         self.particles = []
 
     def update(self, dt):
@@ -73,6 +75,9 @@ class TitleScreenState(State):
         surface.blit(
             self.quit_surf, dest=(16, surface.height - self.quit_surf.height - 16)
         )
+        surface.blit(
+            self.credits_surf, dest=(surface.width - self.credits_surf.width - 16, surface.height - self.credits_surf.height - 16)
+        )
 
         for particle in self.particles:
             fx, fy = particle
@@ -84,5 +89,8 @@ class TitleScreenState(State):
                 pygame.draw.rect(surface, (brightness,) * 3, (x + dx, y, 1, 4))
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self.mgr.push(LevelManager(self.mgr))
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                self.mgr.push(LevelManager(self.mgr))
+            elif event.key == pygame.K_c:
+                self.mgr.push(Credits(self.mgr))
