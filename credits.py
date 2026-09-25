@@ -1,3 +1,5 @@
+import sys
+import PIL
 import pygame
 
 from consts import BG_COLOR, SCREEN_HEIGHT, SCREEN_WIDTH
@@ -5,14 +7,20 @@ from resources import res
 from state import State
 
 
+def fmtver(ver):
+    maj, min, patch, *_ = ver
+    return f"{maj}.{min}.{patch}"
+
 class Credits(State):
     def __init__(self, mgr):
         super().__init__(mgr)
         self.lines = (
             "This game is an entry for the PyWeek September 2026 challenge “Borrowed Time”.\nhttps://pyweek.org/42/",
+            "I would also like to shout out the Python Discord :)\nhttps://discord.gg/python",
             "Made by Bharadwaj Raju, open source (MIT).\nhttps://github.com/bharadwaj-raju/time-value-inc",
             "Font is GNU Unifont, licensed under the SIL Open Font License.\nhttps://unifoundry.com/unifont/",
             "Sprites drawn by me in LibreSprite and KolourPaint.",
+            f"pygame-ce {fmtver(pygame.vernum)}\nSDL {fmtver(pygame.version.SDL)}\nPillow {PIL.__version__}\nPython {fmtver(sys.version_info)}",
         )
         self.player_sprite = pygame.transform.scale(res.player_shock, (128, 128))
         self.guard_sprite = pygame.transform.scale(res.enemy_spotted, (128, 128))
