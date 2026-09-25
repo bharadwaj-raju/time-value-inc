@@ -8,7 +8,7 @@ class Save:
             with open(path, "r") as f:
                 data = json.load(f)
             self.last_stage = data["last_stage"]
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, KeyError):
             print(f"Could not read save file {path!r}")
             print("But that's okay.")
             self.last_stage = "title-screen"

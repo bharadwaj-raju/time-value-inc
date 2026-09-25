@@ -23,3 +23,21 @@ class LevelDoneState(State):
         surface.blit(self.extra_msg_text, (SCREEN_WIDTH // 2 - self.extra_msg_text.width // 2, 128))
         surface.blit(self.continue_prompt_text, (SCREEN_WIDTH // 2 - self.continue_prompt_text.width // 2, SCREEN_HEIGHT - 64))
         surface.blit(self.sprite, (SCREEN_WIDTH // 2 - self.sprite.width // 2, SCREEN_HEIGHT // 2 - self.sprite.height // 2))
+
+class WantResetState(State):
+    def __init__(self, mgr):
+        super().__init__(mgr)
+        self.finished_text = res.render_text("The mission is over, you can go home.\n\nWait, what? You had fun? You want to do it again?\n\nI guess I could talk to the Time Value Inc. folks and send you back in time…\n\nIf you really want to erase your progress and start again, press [ENTER].\nOtherwise, [ESC].", 16)
+
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                res.save.last_stage = "title-screen"
+                res.save.save()
+            elif event.key == pygame.K_ESCAPE:
+                self.mgr.pop()  # self
+                self.mgr.pop()  # level manager
+
+    def draw(self, surface):
+        surface.fill(BG_COLOR)
+        surface.blit(self.finished_text, (16, 16))

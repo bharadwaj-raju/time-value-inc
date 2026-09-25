@@ -320,7 +320,7 @@ class CoreGameState(State):
                 self.speedup = True
                 self.end_speedup_timer.start()
             elif event.key == pygame.K_i:
-                self.player.pos = pygame.Vector2(self.level.goal) * self.level.scale_factor
+                self.mgr.pop()
 
     def update(self, dt):
         self.t += dt
