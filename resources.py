@@ -7,6 +7,7 @@ from animation import Animation
 from consts import ROOT
 from icon import Icon
 from level_map import LevelMap
+from save import Save
 
 FONT_FILE = ROOT / "unifont-subset.ttf"
 
@@ -39,6 +40,8 @@ class Resources:
 
     levels: list[LevelMap]
     tutorials: list[LevelMap]
+
+    save: Save
 
     @classmethod
     def load(cls):
@@ -92,7 +95,9 @@ class Resources:
                 )
             )
         for lvl in levels_meta["levels"]:
-            cls.tutorials.append(LevelMap(Image.open(ROOT / "levels" / lvl)))
+            cls.levels.append(LevelMap(Image.open(ROOT / "levels" / lvl)))
+
+        cls.save = Save(ROOT / "save.json")
 
     @classmethod
     def render_text(cls, text, size) -> pygame.Surface:

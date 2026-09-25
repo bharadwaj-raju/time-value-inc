@@ -1,4 +1,3 @@
-import copy
 import math
 from collections import deque
 
@@ -269,9 +268,9 @@ def mm_ss(t: float) -> str:
 
 
 class CoreGameState(State):
-    def __init__(self, mgr: StateManager):
+    def __init__(self, mgr: StateManager, level: LevelMap):
         super().__init__(mgr)
-        self.level = res.tutorials[0]
+        self.level = level
 
         self.t = 0
 
@@ -320,6 +319,8 @@ class CoreGameState(State):
             elif event.key == pygame.K_s and not (self.debuff or self.speedup):
                 self.speedup = True
                 self.end_speedup_timer.start()
+            elif event.key == pygame.K_i:
+                self.player.pos = pygame.Vector2(self.level.goal) * self.level.scale_factor
 
     def update(self, dt):
         self.t += dt
@@ -345,6 +346,9 @@ class CoreGameState(State):
                     if pygame.Rect(lx, ly, lw, lh).collidepoint(*pos):
                         self.mgr.push(CaughtHoldEffectState(self.mgr))
                         return
+        assert self.level.goal
+        if self.player.pos.distance_squared_to(pygame.Vector2(*self.level.goal)*self.level.scale_factor) <= 500:
+            self.mgr.pop()
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
         self.end_speedup_timer.update(dt)
@@ -430,6 +434,7 @@ class CoreGameState(State):
     def load_snapshot(self, snap, penalty=0.0):
         t, (player_snap, guard_snaps, firing_lasers, fire_lasers_timer, guard_step_timer) = snap
         self.player.load_snapshot(player_snap)
+        self.player.vel = pygame.Vector2(0.0, 0.0)
         for guard, guard_snap in zip(self.guards, guard_snaps):
             guard.load_snapshot(guard_snap)
         self.firing_lasers = firing_lasers
@@ -598,7 +603,7 @@ class SnapshotViewState(State):
         player = Player(self.core.level)
         player.load_snapshot(player_snap)
         guards = [
-            Guard(self.core.guards[i].route, self.core.level) for i in enumerate(guards_snap)
+            Guard(self.core.guards[i].route, self.core.level) for i, _ in enumerate(guards_snap)
         ]
         for guard, guard_snap in zip(guards, guards_snap):
             guard.load_snapshot(guard_snap)

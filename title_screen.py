@@ -4,8 +4,8 @@ import pygame
 import pygame.draw
 
 from consts import BG_COLOR
-from core_game import CoreGameState
 from geometry import lerp
+from level_manager import LevelManager
 from resources import res
 from state import State, StateManager
 
@@ -85,4 +85,4 @@ class TitleScreenState(State):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self.mgr.change(CoreGameState(self.mgr))
+            self.mgr.push(LevelManager(self.mgr))
