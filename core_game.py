@@ -348,7 +348,7 @@ class CoreGameState(State):
                         self.mgr.push(CaughtHoldEffectState(self.mgr))
                         return
         assert self.level.goal
-        if self.player.pos.distance_squared_to(pygame.Vector2(*self.level.goal)*self.level.scale_factor) <= 500:
+        if self.player.pos.distance_squared_to(pygame.Vector2(*self.level.goal)*self.level.scale_factor) <= 600:
             self.mgr.pop()
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
