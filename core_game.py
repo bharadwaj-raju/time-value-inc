@@ -1,3 +1,4 @@
+import os
 import math
 from collections import deque
 
@@ -319,7 +320,7 @@ class CoreGameState(State):
             elif event.key == pygame.K_s and not (self.debuff or self.speedup):
                 self.speedup = True
                 self.end_speedup_timer.start()
-            elif event.key == pygame.K_i:
+            elif event.key == pygame.K_i and os.getlogin() == "bharadwaj":
                 self.mgr.pop()
 
     def update(self, dt):
