@@ -19,6 +19,7 @@ class Credits(State):
             "This game is an entry for the PyWeek September 2026 challenge “Borrowed Time”.\nhttps://pyweek.org/42/",
             "I would also like to shout out the Python Discord :)\nhttps://discord.gg/python",
             "Made by Bharadwaj Raju, open source (MIT).\nhttps://github.com/bharadwaj-raju/time-value-inc",
+            "Playtesting by blankriot96 and my brother.",
             "Thanks to Nicky Case, and Amit Patel of Red Blob Games\nfor their resources on implementing the visibility and lighting mechanic.\nhttps://ncase.me/sight-and-light/\nhttps://www.redblobgames.com/articles/visibility/",
             "Font is GNU Unifont, licensed under the SIL Open Font License.\nhttps://unifoundry.com/unifont/",
             "Sprites drawn by me in LibreSprite and KolourPaint.",
