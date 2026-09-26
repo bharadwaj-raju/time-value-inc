@@ -12,6 +12,10 @@
           "4,2": [4, 4]
         }
       }
+    },
+    {
+      "file": "tut3.ppm",
+      "text": "Beware of the guards! If you get caught, BACK IN TIME will kick in."
     }
   ],
   "levels": [
