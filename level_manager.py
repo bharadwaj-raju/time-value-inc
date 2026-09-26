@@ -30,7 +30,6 @@ class LevelManager(State):
         super().__init__(mgr)
         self.stage = res.save.last_stage
         print(f"Last stage per save: {self.stage}")
-        print(self.mgr.stack)
         
     def start_stage(self, stage: str):
         if stage == "title-screen":
