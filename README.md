@@ -17,7 +17,6 @@ python run_game.py
 
 ```powershell
 py -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-py main.py
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python run_game.py
 ```
