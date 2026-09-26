@@ -44,7 +44,7 @@ class IntroScreed(State):
 
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
             self.line += 1
             if self.line == len(self.lines):
                 self.mgr.pop()

@@ -29,11 +29,11 @@ class Credits(State):
         self.guard_sprite = pygame.transform.scale(res.enemy_spotted, (128, 128))
         self.text = res.render_text("\n\n".join(self.lines), 16)
         self.continue_prompt_text = res.render_text(
-            "Press [ENTER] to go back to the title screen", 16
+            "Press [ENTER] or [ESC] to go back to the title screen", 16
         )
 
     def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
             self.mgr.pop()
 
     def draw(self, surface):
