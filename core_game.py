@@ -1,12 +1,12 @@
-import os
 import math
+import os
 from collections import deque
 
 import pygame
 import pygame.gfxdraw
 
 from animation import AnimationPlayer, AnimationPlayStyle
-from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR
+from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, DISABLED_COLOR
 from geometry import (
     adjacents,
     adjacents_cardinal,
@@ -300,6 +300,7 @@ class CoreGameState(State):
 
         self.backinttime_key_label = res.render_text("BACK IN TIME\n[B]", 16)
         self.speedup_key_label = res.render_text("SPEEDUP\n[S]", 16)
+        self.speedup_disabled_key_label = res.render_text("SPEEDUP\n[S]", 16, color=DISABLED_COLOR)
 
         self.speedup = False
         self.end_speedup_timer = Timer(
@@ -405,9 +406,14 @@ class CoreGameState(State):
             self.backinttime_key_label,
             dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
-        res.ff_icon.draw(surface, dest=(btns_offset_x + 256, AREA_HEIGHT + 16), scale=3)
+        ff_color = (255, 255, 255)
+        if self.debuff:
+            ff_color = DISABLED_COLOR
+        if self.speedup:
+            ff_color = SPEEDUP_COLOR
+        res.ff_icon.draw(surface, dest=(btns_offset_x + 256, AREA_HEIGHT + 16), scale=3, color=ff_color)
         surface.blit(
-            self.speedup_key_label,
+            self.speedup_key_label if not self.debuff else self.speedup_disabled_key_label,
             dest=(btns_offset_x + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
         self.draw_countdown(
@@ -456,6 +462,8 @@ class CoreGameState(State):
         self.fire_lasers_timer.load_snapshot(fire_lasers_timer)
         self.guard_timer.load_snapshot(guard_step_timer)
         self.t = t
+        self.speedup = False
+        self.end_speedup_timer.stop()
         self.debuff = True
         self.end_debuff_timer.time_left += penalty
         self.end_debuff_timer.duration += penalty

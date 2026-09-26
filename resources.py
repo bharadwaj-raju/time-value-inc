@@ -100,7 +100,7 @@ class Resources:
         cls.save = Save(ROOT / "save.json")
 
     @classmethod
-    def render_text(cls, text, size) -> pygame.Surface:
+    def render_text(cls, text, size, color=(255, 255, 255)) -> pygame.Surface:
         font = {
             8: res.font8,
             16: res.font16,
@@ -108,7 +108,7 @@ class Resources:
             64: res.font64,
             128: res.font128,
         }[size]
-        return font.render(text, antialias=False, color=(255, 255, 255))
+        return font.render(text, antialias=False, color=color)
 
 
 res = Resources()
