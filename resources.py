@@ -1,5 +1,4 @@
 import json
-from functools import cache
 
 import pygame
 from PIL import Image
@@ -42,6 +41,8 @@ class Resources:
 
     key: pygame.Surface
     lock: pygame.Surface
+
+    tick: pygame.mixer.Sound
 
     levels: list[LevelMap]
     tutorials: list[LevelMap]
@@ -97,6 +98,9 @@ class Resources:
         cls.lock = pygame.image.load(
             ROOT / "sprites/Sprite-Lock.png"
         ).convert_alpha()
+
+        cls.tick = pygame.mixer.Sound(ROOT / "audio/tick.wav")
+        cls.tick.set_volume(0.5)
 
         levels_meta = json.loads((ROOT / "levels/meta.json").read_text())
         cls.levels = []
