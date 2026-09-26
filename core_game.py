@@ -6,7 +6,7 @@ import pygame
 import pygame.gfxdraw
 
 from animation import AnimationPlayer, AnimationPlayStyle
-from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, DISABLED_COLOR
+from consts import AREA_HEIGHT, AREA_WIDTH, BG_COLOR, DISABLED_COLOR, STATUSBAR_HEIGHT
 from geometry import (
     adjacents,
     adjacents_cardinal,
@@ -27,6 +27,7 @@ GUARD_VIS_COLOR = (255, 255, 0, 128)
 GUARD_VIS_ALERT_COLOR = (255, 100, 0, 128)
 SPEEDUP_COLOR = (106, 190, 48)
 REPAYMENT_COLOR = (251, 242, 54)
+BACKINTIME_COLOR = (91, 110, 225)
 
 
 class MovableEntity:
@@ -296,10 +297,14 @@ class CoreGameState(State):
             duration=0.0, repeating=False, callback=self.end_debuff
         )
 
-        self.repayment_label = res.render_text("REPAYMENT", 16)
+        self.repayment_label = res.render_text("REPAYMENT", 16, color=DISABLED_COLOR)
+        self.repayment_active_label = res.render_text("REPAYMENT", 16, color=REPAYMENT_COLOR)
 
         self.backinttime_key_label = res.render_text("BACK IN TIME\n[B]", 16)
+        self.backinttime_active_key_label = res.render_text("BACK IN TIME\n[B]", 16, color=BACKINTIME_COLOR)
+        
         self.speedup_key_label = res.render_text("SPEEDUP\n[S]", 16)
+        self.speedup_active_key_label = res.render_text("SPEEDUP\n[S]", 16, color=SPEEDUP_COLOR)
         self.speedup_disabled_key_label = res.render_text("SPEEDUP\n[S]", 16, color=DISABLED_COLOR)
 
         self.speedup = False
@@ -365,15 +370,15 @@ class CoreGameState(State):
         self.goal_anim.update(dt)
 
     def draw_countdown(self, surface, x, y, fraction, color):
-        pygame.draw.rect(surface, (255, 255, 255), (x, y, 100, 16), 2)
+        pygame.draw.rect(surface, (255, 255, 255), (x, y, 50, 8), 1)
         pygame.draw.rect(
             surface,
             color,
             (
                 x,
                 y,
-                100 * fraction,
-                16,
+                50 * fraction,
+                8,
             ),
         )
 
@@ -395,8 +400,16 @@ class CoreGameState(State):
         # goal_rect = pygame.Rect(goal_pos, goal_size)
         # pygame.draw.rect(surface, (255, 0, 0), player_rect, width=1)
         # pygame.draw.rect(surface, (0, 255, 0), goal_rect, width=1)
+        clock = mm_ss(self.t)
+        clock_secs = clock[:-2]
+        clock_mils = clock[-2:]
+        clock_secs_text = res.render_text(clock_secs, 32)
+        clock_mils_text = res.render_text(clock_mils, 32, color=DISABLED_COLOR)
         surface.blit(
-            res.render_text(mm_ss(self.t), 32), dest=(32, AREA_HEIGHT + 16 + 8)
+            clock_secs_text, dest=(32, AREA_HEIGHT + STATUSBAR_HEIGHT // 2 - clock_secs_text.height // 2 - 2)
+        )
+        surface.blit(
+            clock_mils_text, dest=(32 + clock_secs_text.width, AREA_HEIGHT + STATUSBAR_HEIGHT // 2 - clock_secs_text.height // 2 - 2)
         )
         btns_offset_x = 128 + 32
         res.backintime_icon.draw(
@@ -407,40 +420,45 @@ class CoreGameState(State):
             dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
         ff_color = (255, 255, 255)
+        ff_label = self.speedup_key_label
         if self.debuff:
             ff_color = DISABLED_COLOR
+            ff_label = self.speedup_disabled_key_label
         if self.speedup:
             ff_color = SPEEDUP_COLOR
+            ff_label = self.speedup_active_key_label
         res.ff_icon.draw(surface, dest=(btns_offset_x + 256, AREA_HEIGHT + 16), scale=3, color=ff_color)
         surface.blit(
-            self.speedup_key_label if not self.debuff else self.speedup_disabled_key_label,
+            ff_label,
             dest=(btns_offset_x + 256 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
-        self.draw_countdown(
-            surface,
-            btns_offset_x + 256 + 8,
-            AREA_HEIGHT + 32 + 8 + 32,
-            0.0
-            if not self.speedup
-            else self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
-            SPEEDUP_COLOR,
-        )
+        if self.speedup:
+            self.draw_countdown(
+                surface,
+                self.player.pos.x - self.player.radius - 10,# - 50//2,
+                self.player.pos.y - self.player.radius - 12,
+                0.0 if self.end_speedup_timer.duration == 0.0
+                else
+                self.end_speedup_timer.time_left / self.end_speedup_timer.duration,
+                SPEEDUP_COLOR,
+            )
         surface.blit(
-            self.repayment_label,
+            self.repayment_label if not self.debuff else self.repayment_active_label,
             dest=(
-                AREA_WIDTH - 116 - self.repayment_label.width - 8,
-                AREA_HEIGHT + 32 + 4,
-            ),
+                AREA_WIDTH - 32 - self.repayment_label.width - 8,
+                AREA_HEIGHT + STATUSBAR_HEIGHT // 2 - self.repayment_label.height // 2,
+            )
         )
-        self.draw_countdown(
-            surface,
-            AREA_WIDTH - 100 - 16,
-            AREA_HEIGHT + 32 + 4,
-            0.0
-            if not self.debuff or self.end_debuff_timer.duration == 0.0
-            else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
-            REPAYMENT_COLOR,
-        )
+        if self.debuff:
+            self.draw_countdown(
+                surface,
+                self.player.pos.x - self.player.radius - 10,# - 50//2,
+                self.player.pos.y - self.player.radius - 12,
+                0.0
+                if self.end_debuff_timer.duration == 0.0
+                else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
+                REPAYMENT_COLOR,
+            )
 
     def take_snapshot(self):
         snap = (
@@ -621,6 +639,14 @@ class SnapshotViewState(State):
                 no_snaps_text, dest=(AREA_WIDTH // 2 - no_snaps_text.width // 2, 32)
             )
             return
+        btns_offset_x = 128 + 32
+        res.backintime_icon.draw(
+            surface, dest=(btns_offset_x + 32, AREA_HEIGHT + 16), scale=3, color=BACKINTIME_COLOR
+        )
+        surface.blit(
+            self.core.backinttime_active_key_label,
+            dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
+        )
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
         snap_t, (player_snap, guards_snap, firing_lasers, *_) = self.snapshots[self.selected]
         player = Player(self.core.level)
@@ -669,7 +695,7 @@ class SnapshotViewState(State):
                 AREA_HEIGHT // 2 + snapshot_preview.height // 2,
             ),
         )
-        disclaimer = f"Repayment: Your movement speed will be halved for the next {time_ago * 1.25:.1f} seconds"
+        disclaimer = f"REPAYMENT: Your movement speed will be halved for the next {time_ago * 1.25:.1f} seconds"
         instr = "[ENTER] to confirm"
         if not self.because_caught:
             instr += "      [ESC] to cancel"

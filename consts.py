@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 
 AREA_WIDTH, AREA_HEIGHT = 800, 600
-STATUSBAR_HEIGHT = 100
+STATUSBAR_HEIGHT = 64 + 16
 
 BG_COLOR = (24, 24, 28)
 DISABLED_COLOR = (120, 120, 120)
