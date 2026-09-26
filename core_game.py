@@ -93,6 +93,9 @@ class MovableEntity:
             self.pos.y = AREA_HEIGHT - self.radius
             self.vel.y = 0
 
+    def get_rect(self) -> pygame.Rect:
+        return pygame.Rect(self.pos - (self.radius, self.radius), (self.radius * 2, self.radius * 2))
+
 
 class Player(MovableEntity):
     def __init__(self, level: LevelMap):
@@ -348,7 +351,11 @@ class CoreGameState(State):
                         self.mgr.push(CaughtHoldEffectState(self.mgr))
                         return
         assert self.level.goal
-        if self.player.pos.distance_squared_to(pygame.Vector2(*self.level.goal)*self.level.scale_factor) <= 600:
+        goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
+        goal_size = self.goal_anim.animation.size
+        player_rect = self.player.get_rect()
+        goal_rect = pygame.Rect(goal_pos, goal_size)
+        if player_rect.colliderect(goal_rect):
             self.mgr.pop()
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
@@ -380,6 +387,13 @@ class CoreGameState(State):
             self.goal_anim,
             firing_lasers=self.firing_lasers,
         )
+        # assert self.level.goal
+        # goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
+        # goal_size = self.goal_anim.animation.size
+        # player_rect = self.player.get_rect()
+        # goal_rect = pygame.Rect(goal_pos, goal_size)
+        # pygame.draw.rect(surface, (255, 0, 0), player_rect, width=1)
+        # pygame.draw.rect(surface, (0, 255, 0), goal_rect, width=1)
         surface.blit(
             res.render_text(mm_ss(self.t), 32), dest=(32, AREA_HEIGHT + 16 + 8)
         )

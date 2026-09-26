@@ -56,7 +56,7 @@ class LevelManager(State):
         old_saved = res.save.last_stage
         res.save.last_stage = self.stage
         res.save.save()
-        print("Saved")
+        print("Saved", self.stage)
         if old_saved != self.stage and (self.stage.startswith("tutorial-") or (self.stage.startswith("level-") and int(self.stage.removeprefix("level-")) != len(res.levels) - 1)):
             self.mgr.push(LevelDoneState(self.mgr, extra_message="There’s more, though…"))
             return
