@@ -17,6 +17,9 @@
   "levels": [
     {
       "file": "1.ppm"
+    },
+    {
+      "file": "2.ppm"
     }
   ]
 }

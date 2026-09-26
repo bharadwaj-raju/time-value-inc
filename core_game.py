@@ -295,7 +295,7 @@ class CoreGameState(State):
         self.guard_timer.start()
 
         self.snapshot_timer = Timer(
-            duration=0.5, repeating=True, callback=self.take_snapshot
+            duration=1.0, repeating=True, callback=self.take_snapshot
         )
         self.snapshot_timer.start()
 
@@ -333,6 +333,7 @@ class CoreGameState(State):
         self.need_key = self.level.key is not None
 
         self.trapdoors_thrown = []
+        self.take_snapshot()
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
