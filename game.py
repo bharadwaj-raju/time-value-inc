@@ -19,7 +19,7 @@ state_mgr = StateManager()
 state_mgr.push(TitleScreenState(state_mgr))
 while running:
     # Delta time in seconds
-    dt = clock.tick(120) / 1000.0
+    dt = clock.tick(60) / 1000.0
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_q:
