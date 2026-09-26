@@ -1,5 +1,5 @@
-from functools import cache
 import json
+from functools import cache
 
 import pygame
 from PIL import Image
@@ -14,6 +14,7 @@ FONT_FILE = ROOT / "unifont-subset.ttf"
 
 
 class Resources:
+    font256: pygame.font.Font
     font128: pygame.font.Font
     font64: pygame.font.Font
     font32: pygame.font.Font
@@ -49,6 +50,7 @@ class Resources:
 
     @classmethod
     def load(cls):
+        cls.font256 = pygame.font.Font(FONT_FILE, 256)
         cls.font128 = pygame.font.Font(FONT_FILE, 128)
         cls.font64 = pygame.font.Font(FONT_FILE, 64)
         cls.font32 = pygame.font.Font(FONT_FILE, 32)
@@ -118,6 +120,7 @@ class Resources:
             32: res.font32,
             64: res.font64,
             128: res.font128,
+            256: res.font256
         }[size]
         return font.render(text, antialias=False, color=color)
 

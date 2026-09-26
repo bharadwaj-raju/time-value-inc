@@ -640,9 +640,13 @@ class SnapshotViewState(State):
         self.blur_radius = 0
         self.darkening = 0
         self.blurred_surf = None
-        self.left_arrow = res.render_text("←", 128)
-        self.right_arrow = res.render_text("→", 128)
+        self.left_arrow = res.render_text("←", 256, color=BACKINTIME_COLOR)
+        self.right_arrow = res.render_text("→", 256, color=BACKINTIME_COLOR)
         self.because_caught = because_caught
+
+        self.arrow_animate_delta = 0
+        self.arrow_animate_timer = Timer(duration=0.2, repeating=True, callback=self.arrow_animate)
+        self.arrow_animate_timer.start()
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -665,6 +669,10 @@ class SnapshotViewState(State):
             self.blur_radius += 1
         if self.darkening < 100:
             self.darkening += 10
+        self.arrow_animate_timer.update(dt)
+
+    def arrow_animate(self):
+        self.arrow_animate_delta = 8 if self.arrow_animate_delta == 0 else 0
 
     def draw(self, surface):
         surface.fill(BG_COLOR)
@@ -720,7 +728,7 @@ class SnapshotViewState(State):
             surface.blit(
                 self.left_arrow,
                 dest=(
-                    AREA_WIDTH // 4 - 128,
+                    AREA_WIDTH // 4 - 128 - 32 - self.arrow_animate_delta,
                     AREA_HEIGHT // 2 - self.left_arrow.height // 2,
                 ),
             )
@@ -728,7 +736,7 @@ class SnapshotViewState(State):
             surface.blit(
                 self.right_arrow,
                 dest=(
-                    3 * AREA_WIDTH // 4 + 64,
+                    3 * AREA_WIDTH // 4 + 32 + self.arrow_animate_delta,
                     AREA_HEIGHT // 2 - self.left_arrow.height // 2,
                 ),
             )
