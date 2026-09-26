@@ -33,8 +33,6 @@ while running:
         if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_q:
             running = False
             break
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_QUOTE:
-            print(state_mgr.stack)
         state_mgr.handle_event(event)
 
     tick_timer.update(dt)

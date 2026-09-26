@@ -22,7 +22,6 @@ def get_next_stage(stage: str) -> str:
         return "level-" + str(nlvl + 1)
     elif stage == "finished" or stage == "want-reset":
         return "want-reset"
-    print(f"don't know how to continue from {stage!r}")
     return "title-screen"
 
 
@@ -50,7 +49,6 @@ class LevelManager(State):
             self.mgr.push(WantResetState(self.mgr))
 
     def update(self, dt):
-        print(dt)
         if self.mgr.stack[-1] is not self:
             return
         old_saved = res.save.last_stage

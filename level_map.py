@@ -146,4 +146,3 @@ class LevelMap:
             for tile in route:
                 guard_tiles.discard(tile)
             self.guard_routes.append(set(route))
-        print(len(self.guard_routes))

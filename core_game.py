@@ -405,7 +405,6 @@ class CoreGameState(State):
         self.player.update(player_dt, walls)
         self.goal_anim.update(dt)
         if len(self.state_snapshots) == 0:
-            print("taking first snapshot")
             self.take_snapshot()
 
     def draw_countdown(self, surface, x, y, fraction, color):
