@@ -216,6 +216,7 @@ class Guard:
             screen_pos,
         )
 
+scale = pygame.transform.scale_by
 
 def render(
     surface,
@@ -333,7 +334,11 @@ class CoreGameState(State):
         self.need_key = self.level.key is not None
 
         self.trapdoors_thrown = []
-        self.take_snapshot()
+
+        assert self.level.goal
+        goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
+        goal_size = self.goal_anim.animation.size
+        self.goal_rect = pygame.Rect(goal_pos, goal_size)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -375,11 +380,7 @@ class CoreGameState(State):
             if player_rect.colliderect(trigger_rect) and trap not in self.trapdoors_thrown:
                 self.trapdoors_thrown.append(trap)
             
-        assert self.level.goal
-        goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
-        goal_size = self.goal_anim.animation.size
-        goal_rect = pygame.Rect(goal_pos, goal_size)
-        if player_rect.colliderect(goal_rect) and (self.got_key or not self.need_key):
+        if player_rect.colliderect(self.goal_rect) and (self.got_key or not self.need_key):
             self.mgr.pop()
         if self.need_key:
             key_pos = self.level.key
@@ -399,6 +400,9 @@ class CoreGameState(State):
             walls.append(trapdoor_rect)
         self.player.update(player_dt, walls)
         self.goal_anim.update(dt)
+        if len(self.state_snapshots) == 0:
+            print("taking first snapshot")
+            self.take_snapshot()
 
     def draw_countdown(self, surface, x, y, fraction, color):
         pygame.draw.rect(surface, (255, 255, 255), (x, y, 50, 8), 1)
@@ -663,6 +667,7 @@ class SnapshotViewState(State):
             self.darkening += 10
 
     def draw(self, surface):
+        surface.fill(BG_COLOR)
         if self.blurred_surf:
             surface.blit(self.blurred_surf)
         else:
@@ -697,6 +702,7 @@ class SnapshotViewState(State):
         snapshot_state.load_snapshot(self.snapshots[self.selected])
         snapshot_state.draw(snapshot_preview)
         snap_t = self.snapshots[self.selected][0]
+        pygame.draw.rect(snapshot_preview, (255, 255, 255), (*snapshot_state.player.pos - (snapshot_state.player.radius, snapshot_state.player.radius), snapshot_state.player.radius*2, snapshot_state.player.radius*2), width=2)
         snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
         if self.because_caught:
             powered_by_text = res.render_text(
