@@ -6,7 +6,7 @@
     },
     {
       "file": "tut2.ppm",
-      "text": "That door requires a key. Try exploring to find it.\n\nAlso, sometimes you may get trapped. Just use the BACK IN TIME feature.",
+      "text": "That door requires a key. Try exploring to find it.\n\nAlso, sometimes you may get trapped. Just use the BACK IN TIME feature.\n\nYour key will stay with you even across time travel!",
       "mappings": {
         "trapdoor_triggers": {
           "4,2": [4, 4]
