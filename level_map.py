@@ -19,9 +19,14 @@ class LevelMap:
     TILEMAP_LASER_GUN_DOWN = (255, 0, 255)
     TILEMAP_LASER_DANGER = (128, 0, 128)
     TILEMAP_TUTORIAL_TEXT_MARKER = (128, 128, 128)
+    TILEMAP_TRAPDOOR = (128, 0, 0)
+    TILEMAP_TRAPDOOR_TRIGGER = (128, 64, 0)
+    TILEMAP_KEY = (255, 255, 128)
+    TILEMAP_LOCKED_DOOR = (0, 128, 128)
 
-    def __init__(self, im: Image.Image, tutorial_text: str | None = None):
+    def __init__(self, im: Image.Image, tutorial_text: str | None = None, mappings: dict | None = None):
         self.im = im
+        self.mappings = mappings or {}
         self.tutorial_text = tutorial_text
         self.scale_factor = AREA_WIDTH // im.width
         self.process()
@@ -38,6 +43,13 @@ class LevelMap:
         self.laser_guns_danger = []
         self.tutorial_text_marker = None
         self.tutorial_text_tiles = []
+        self.trapdoor_triggers = {}
+        self.locked_door = None
+        for trigger, trap in self.mappings.get("trapdoor_triggers", {}).items():
+            trigger = tuple(map(int, trigger.split(",")))
+            trigger = (trigger[0] * self.scale_factor, trigger[1] * self.scale_factor)
+            self.trapdoor_triggers[trigger] = (trap[0] * self.scale_factor, trap[1] * self.scale_factor)
+        self.key = None
         guard_tiles = set()
         wall_tiles = set()
         for y in range(self.im.height):
@@ -53,6 +65,10 @@ class LevelMap:
                             self.scale_factor,
                         )
                     )
+                if p == LevelMap.TILEMAP_LOCKED_DOOR:
+                    self.locked_door = (x * self.scale_factor, y * self.scale_factor)
+                if p == LevelMap.TILEMAP_KEY:
+                    self.key = (x * self.scale_factor, y * self.scale_factor)
                 if p == LevelMap.TILEMAP_TUTORIAL_TEXT_MARKER:
                     if not self.tutorial_text_marker:
                         self.tutorial_text_marker = ((x * self.scale_factor, y * self.scale_factor))

@@ -3,7 +3,20 @@
     {
       "file": "tut1.ppm",
       "text": "Those lasers cycle a little too quickly to easily dodge…\n\nUse your SPEEDUP feature! It’ll slow down everything except you for 3 seconds,\nwhich should let you get past them.\n\nPay attention to when the REPAYMENT kicks in, though — you’ll be slowed down then.\n\nAnd don’t worry, if you get killed, BACK IN TIME will kick in automatically!"
+    },
+    {
+      "file": "tut2.ppm",
+      "text": "That door requires a key. Try exploring to find it.\n\nAlso, sometimes you may get trapped. Just use the BACK IN TIME feature.",
+      "mappings": {
+        "trapdoor_triggers": {
+          "4,2": [4, 4]
+        }
+      }
     }
   ],
-  "levels": ["1.ppm"]
+  "levels": [
+    {
+      "file": "1.ppm"
+    }
+  ]
 }

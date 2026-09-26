@@ -38,6 +38,9 @@ class Resources:
 
     goal_anim: Animation
 
+    key: pygame.Surface
+    lock: pygame.Surface
+
     levels: list[LevelMap]
     tutorials: list[LevelMap]
 
@@ -85,17 +88,24 @@ class Resources:
 
         cls.goal_anim = Animation(ROOT / "sprites" / "Sprite-Goal-Glow.png")
 
+        cls.key = pygame.image.load(
+            ROOT / "sprites/Sprite-Key.png"
+        ).convert_alpha()
+        cls.lock = pygame.image.load(
+            ROOT / "sprites/Sprite-Lock.png"
+        ).convert_alpha()
+
         levels_meta = json.loads((ROOT / "levels/meta.json").read_text())
         cls.levels = []
         cls.tutorials = []
         for tut in levels_meta["tutorials"]:
-            cls.tutorials.append(
-                LevelMap(
-                    Image.open(ROOT / "levels" / tut["file"]), tutorial_text=tut["text"]
-                )
-            )
+            file = ROOT / "levels" / tut["file"]
+            mappings = tut.get("mappings")
+            cls.tutorials.append(LevelMap(Image.open(file), tutorial_text=tut["text"], mappings=mappings))
         for lvl in levels_meta["levels"]:
-            cls.levels.append(LevelMap(Image.open(ROOT / "levels" / lvl)))
+            mappings = lvl.get("mappings")
+            file = ROOT / "levels" / lvl["file"]
+            cls.levels.append(LevelMap(Image.open(file), mappings=mappings))
 
         cls.save = Save(ROOT / "save.json")
 

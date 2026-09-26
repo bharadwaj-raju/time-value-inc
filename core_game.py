@@ -226,6 +226,8 @@ def render(
     draw_player=True,
     firing_lasers=False,
     player_just_restored=False,
+    key=None,
+    trapdoors_thrown=(),
 ):
     player_vis_poly = calculate_sweep_line(player.pos.x, player.pos.y, level.wall_edges)
     surface.fill(BG_COLOR)
@@ -236,6 +238,9 @@ def render(
             caught = True
     if draw_player:
         player.draw(surface, caught=caught or player_just_restored)
+    if key:
+        surface.blit(res.key, key)
+        surface.blit(res.lock, level.locked_door)
     if len(player_vis_poly) >= 3:
         fog_surf = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
         fog_surf.fill((10, 10, 15))
@@ -247,6 +252,8 @@ def render(
         surface.blit(fog_surf, (0, 0))
     for wall in level.walls:
         surface.blit(res.wall_base, wall)
+    for trapdoor in trapdoors_thrown:
+        surface.blit(res.wall_base, trapdoor)
     for gun in level.laser_guns:
         surface.blit(
             res.wall_laser_gun_firing if firing_lasers else res.wall_laser_gun_base, gun
@@ -282,7 +289,7 @@ class CoreGameState(State):
         self.player = Player(self.level)
         self.guards = [Guard(route, self.level) for route in self.level.guard_routes]
 
-        self.state_snapshots = deque(maxlen=50)
+        self.state_snapshots = deque(maxlen=5000)
 
         self.guard_timer = Timer(duration=0.5, repeating=True, callback=self.guard_step)
         self.guard_timer.start()
@@ -322,6 +329,11 @@ class CoreGameState(State):
         )
         self.fire_lasers_timer.start()
 
+        self.got_key = False
+        self.need_key = self.level.key is not None
+
+        self.trapdoors_thrown = []
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_b:
@@ -356,17 +368,35 @@ class CoreGameState(State):
                     if pygame.Rect(lx, ly, lw, lh).collidepoint(*pos):
                         self.mgr.push(CaughtHoldEffectState(self.mgr))
                         return
+        player_rect = self.player.get_rect()
+        for trigger, trap in self.level.trapdoor_triggers.items():
+            trigger_rect = pygame.Rect(*trigger, self.level.scale_factor, self.level.scale_factor)
+            if player_rect.colliderect(trigger_rect) and trap not in self.trapdoors_thrown:
+                self.trapdoors_thrown.append(trap)
+            
         assert self.level.goal
         goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
         goal_size = self.goal_anim.animation.size
-        player_rect = self.player.get_rect()
         goal_rect = pygame.Rect(goal_pos, goal_size)
-        if player_rect.colliderect(goal_rect):
+        if player_rect.colliderect(goal_rect) and (self.got_key or not self.need_key):
             self.mgr.pop()
+        if self.need_key:
+            key_pos = self.level.key
+            assert key_pos
+            key_size = res.key.size
+            if player_rect.colliderect(pygame.Rect(key_pos, key_size)):
+                self.got_key = True
         self.snapshot_timer.update(dt)
         self.end_debuff_timer.update(dt)
         self.end_speedup_timer.update(dt)
-        self.player.update(player_dt, self.level.walls)
+        walls = self.level.walls[:]
+        if self.need_key and not self.got_key:
+            lock_rect = pygame.Rect(*self.level.locked_door, self.level.scale_factor, self.level.scale_factor)  # ty: ignore
+            walls.append(lock_rect)
+        for trapdoor in self.trapdoors_thrown:
+            trapdoor_rect = pygame.Rect(*trapdoor, self.level.scale_factor, self.level.scale_factor)  # ty: ignore[no-matching-overload]
+            walls.append(trapdoor_rect)
+        self.player.update(player_dt, walls)
         self.goal_anim.update(dt)
 
     def draw_countdown(self, surface, x, y, fraction, color):
@@ -392,6 +422,8 @@ class CoreGameState(State):
             self.guards,
             self.goal_anim,
             firing_lasers=self.firing_lasers,
+            key=self.level.key,
+            trapdoors_thrown=self.trapdoors_thrown,
         )
         # assert self.level.goal
         # goal_pos = pygame.Vector2(*self.level.goal) * self.level.scale_factor
@@ -459,19 +491,24 @@ class CoreGameState(State):
                 else self.end_debuff_timer.time_left / self.end_debuff_timer.duration,
                 REPAYMENT_COLOR,
             )
+        if self.got_key:
+            surface.blit(res.key, dest=(AREA_WIDTH - 32 - self.repayment_label.width - 8 - 40 - 32, AREA_HEIGHT + STATUSBAR_HEIGHT // 2 - res.key.height // 2))
 
     def take_snapshot(self):
+        # got_key is intentionally excluded from snapshotting
+        # keys are transported across time with the player, let us say :)
         snap = (
             self.player.snapshot(),
             [g.snapshot() for g in self.guards],
             self.firing_lasers,
             self.fire_lasers_timer.snapshot(),
             self.guard_timer.snapshot(),
+            self.trapdoors_thrown.copy()
         )
         self.state_snapshots.append((self.t, snap))
 
     def load_snapshot(self, snap, penalty=0.0):
-        t, (player_snap, guard_snaps, firing_lasers, fire_lasers_timer, guard_step_timer) = snap
+        t, (player_snap, guard_snaps, firing_lasers, fire_lasers_timer, guard_step_timer, trapdoors_thrown) = snap
         self.player.load_snapshot(player_snap)
         self.player.vel = pygame.Vector2(0.0, 0.0)
         for guard, guard_snap in zip(self.guards, guard_snaps):
@@ -479,6 +516,7 @@ class CoreGameState(State):
         self.firing_lasers = firing_lasers
         self.fire_lasers_timer.load_snapshot(fire_lasers_timer)
         self.guard_timer.load_snapshot(guard_step_timer)
+        self.trapdoors_thrown = trapdoors_thrown.copy()
         self.t = t
         self.speedup = False
         self.end_speedup_timer.stop()
@@ -530,6 +568,8 @@ class CaughtHoldEffectState(State):
             self.core.goal_anim,
             firing_lasers=self.core.firing_lasers,
             player_just_restored=True,
+            key=self.core.level.key,
+            trapdoors_thrown=self.core.trapdoors_thrown,
         )
 
     def end(self):
@@ -561,6 +601,8 @@ class SnapshotRestoreEffectState(State):
             self.core.goal_anim,
             draw_player=self.draw_player,
             player_just_restored=True,
+            key=self.core.level.key,
+            trapdoors_thrown=self.core.trapdoors_thrown,
         )
 
     def blink(self):
@@ -587,6 +629,8 @@ class SnapshotViewState(State):
             self.core.guards,
             self.core.goal_anim,
             firing_lasers=self.core.firing_lasers,
+            key=self.core.level.key,
+            trapdoors_thrown=self.core.trapdoors_thrown
         )
         self.blur_radius = 0
         self.darkening = 0
@@ -648,15 +692,10 @@ class SnapshotViewState(State):
             dest=(btns_offset_x + 32 + 16 * 3 + 8, AREA_HEIGHT + 16 + 8),
         )
         snapshot_preview = pygame.Surface((AREA_WIDTH, AREA_HEIGHT))
-        snap_t, (player_snap, guards_snap, firing_lasers, *_) = self.snapshots[self.selected]
-        player = Player(self.core.level)
-        player.load_snapshot(player_snap)
-        guards = [
-            Guard(self.core.guards[i].route, self.core.level) for i, _ in enumerate(guards_snap)
-        ]
-        for guard, guard_snap in zip(guards, guards_snap):
-            guard.load_snapshot(guard_snap)
-        render(snapshot_preview, self.core.level, player, guards, self.core.goal_anim, firing_lasers=firing_lasers)
+        snapshot_state = CoreGameState(self.mgr, self.core.level)
+        snapshot_state.load_snapshot(self.snapshots[self.selected])
+        snapshot_state.draw(snapshot_preview)
+        snap_t = self.snapshots[self.selected][0]
         snapshot_preview = pygame.transform.scale_by(snapshot_preview, 0.5)
         if self.because_caught:
             powered_by_text = res.render_text(
