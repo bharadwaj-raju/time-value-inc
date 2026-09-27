@@ -661,7 +661,7 @@ class SnapshotViewState(State):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE and not self.because_caught:
                 self.mgr.pop()
-            elif event.key == pygame.K_LEFT:
+            elif event.key in (pygame.K_LEFT, pygame.K_BACKSPACE):
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_RIGHT:
                 self.selected = min(len(self.snapshots) - 1, self.selected + 1)
@@ -672,6 +672,12 @@ class SnapshotViewState(State):
                 self.core.load_snapshot((snap_t, snap), penalty=repayment)
                 self.mgr.pop()
                 self.mgr.push(SnapshotRestoreEffectState(self.mgr))
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            x, y = event.pos
+            if y <= AREA_HEIGHT and x < AREA_WIDTH // 4:
+                self.selected = max(0, self.selected - 1)
+            elif y <= AREA_HEIGHT and x >= 3 * AREA_WIDTH // 4:
+                self.selected = min(len(self.snapshots) - 1, self.selected + 1)
 
     def update(self, dt):
         if self.blur_radius < 10:
